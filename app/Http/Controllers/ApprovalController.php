@@ -1,0 +1,13 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Requirement;
+use Illuminate\Http\Request;
+
+class ApprovalController extends Controller
+{
+    private function allowed(): void { abort_unless(auth()->user()->canAccess('approvals'), 403); }
+    public function index(Request $request) { $this->allowed(); $requirements = Requirement::with(['items'])->latest('requested_at')->paginate(10); return view('approvals.index', compact('requirements')); }
+    public function decide(Request $request, Requirement $requirement) { $this->allowed(); $decision = $request->validate(['status'=>'required|in:Aprobado,Rechazado'])['status']; $requirement->update(['status'=>$decision,'decision_at'=>now(),'decision_by'=>auth()->id()]); return back()->with('success',"Requerimiento {$decision} correctamente."); }
+}

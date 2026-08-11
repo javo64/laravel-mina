@@ -1,0 +1,13 @@
+<VirtualHost *:80>
+    ServerName sistema.ejemplo.com
+    DocumentRoot /var/www/sistema-mina/public
+
+    <Directory /var/www/sistema-mina/public>
+        AllowOverride All
+        Require all granted
+        Options -Indexes +FollowSymLinks
+    </Directory>
+
+    ErrorLog ${APACHE_LOG_DIR}/sistema-mina-error.log
+    CustomLog ${APACHE_LOG_DIR}/sistema-mina-access.log combined
+</VirtualHost>
