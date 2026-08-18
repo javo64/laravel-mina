@@ -50,7 +50,8 @@ class DailyReportTest extends TestCase
         $form->users()->attach($assigned);
 
         $this->actingAs($unassigned)->get(route('daily-reports.fill', $form))->assertForbidden();
-        $this->actingAs($assigned)->get(route('daily-reports.fill', $form))->assertOk();
+        $this->actingAs($assigned)->get(route('daily-reports.fill', $form))->assertOk()
+            ->assertSee('GPS obligatorio')->assertSee('guardar la traza del registro');
         $this->actingAs($assigned)->post(route('daily-reports.submit', $form), [
             'responses' => ['observacion' => 'Operación normal'],
         ])->assertSessionHasErrors('latitude');

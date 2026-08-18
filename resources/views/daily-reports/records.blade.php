@@ -14,6 +14,7 @@
 <div class="records-summary">
     <span><small>Registros</small><strong>{{ $totalReports }}</strong></span><span><small>Con GPS</small><strong>{{ $gpsReports }}</strong></span><span><small>Usuarios</small><strong>{{ $reportingUsers }}</strong></span>
 </div>
+@if($totalReports>$gpsReports)<div class="records-gps-warning"><b>⌖ {{ $totalReports-$gpsReports }} registro(s) sin ubicación</b><span>Estos registros fueron guardados sin coordenadas y no pueden mostrarse en el mapa. Los nuevos registros con GPS activado sí formarán parte de la traza.</span></div>@endif
 
 <div class="records-central card">
     <section class="records-table-panel">
