@@ -205,4 +205,24 @@ class ProductReceptionTest extends TestCase
                 'items' => [['product_id' => $product->id, 'quantity' => 1]],
             ])->assertSessionHasErrors('supplier');
     }
+
+    public function test_supplier_search_starts_with_two_characters_and_only_returns_matches(): void
+    {
+        $user = User::factory()->create(['permissions' => ['products']]);
+        BusinessPartner::create([
+            'type'=>'Proveedor','document_type'=>'RUC','document_number'=>'20111222333',
+            'name'=>'SUMINISTROS MINEROS SAC','trade_name'=>'SUMIN','is_active'=>true,
+        ]);
+        BusinessPartner::create([
+            'type'=>'Proveedor','document_type'=>'RUC','document_number'=>'20444555666',
+            'name'=>'TRANSPORTES DEL SUR SAC','is_active'=>true,
+        ]);
+
+        $this->actingAs($user)->getJson(route('product-receptions.suppliers.search', ['q'=>'S']))
+            ->assertOk()->assertExactJson([]);
+        $this->actingAs($user)->getJson(route('product-receptions.suppliers.search', ['q'=>'MIN']))
+            ->assertOk()->assertJsonCount(1)->assertJsonPath('0.name', 'SUMINISTROS MINEROS SAC');
+        $this->actingAs($user)->get(route('product-receptions.index'))
+            ->assertOk()->assertSee('supplier-suggestions')->assertDontSee('registered-suppliers');
+    }
 }

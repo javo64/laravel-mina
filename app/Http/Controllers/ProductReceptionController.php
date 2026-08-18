@@ -30,12 +30,27 @@ class ProductReceptionController extends Controller
                 ->orWhere('order_number', 'like', "%$value%")))
             ->latest('received_at')->latest('id')->paginate(10)->withQueryString();
         $products = Product::where('is_active', true)->where('type', 'Producto')->orderBy('name')->get();
-        $suppliers = BusinessPartner::where('is_active', true)
+        $supplierCount = BusinessPartner::where('is_active', true)
             ->whereIn('type', ['Proveedor', 'Cliente y proveedor'])
-            ->orderBy('name')->get(['id', 'document_number', 'name', 'trade_name']);
+            ->count();
         $nextCode = $this->formatCode((ProductReception::max('id') ?? 0) + 1);
 
-        return view('product-receptions.index', compact('receptions', 'products', 'suppliers', 'nextCode'));
+        return view('product-receptions.index', compact('receptions', 'products', 'supplierCount', 'nextCode'));
+    }
+
+    public function searchSuppliers(Request $request)
+    {
+        $this->allowed();
+        $validated = $request->validate(['q'=>['nullable','string','max:100']]);
+        $query = trim((string) ($validated['q'] ?? ''));
+        if (mb_strlen($query) < 2) return response()->json([]);
+
+        return response()->json(BusinessPartner::where('is_active', true)
+            ->whereIn('type', ['Proveedor', 'Cliente y proveedor'])
+            ->where(fn ($search) => $search->where('name', 'like', "%{$query}%")
+                ->orWhere('trade_name', 'like', "%{$query}%")
+                ->orWhere('document_number', 'like', "%{$query}%"))
+            ->orderBy('name')->limit(8)->get(['id','document_number','name','trade_name']));
     }
 
     public function store(Request $request)

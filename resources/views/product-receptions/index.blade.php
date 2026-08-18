@@ -42,14 +42,13 @@
     <div class="modal-head product-modal-head"><span class="modal-icon">↓</span><div><h2>Nueva recepción de productos</h2><p>Las cantidades ingresadas se sumarán al stock actual.</p></div><strong class="reception-correlative">{{ $nextCode }}</strong><button type="button" data-close>×</button></div>
     <div class="reception-form">
         <div class="form-section-title"><strong>Datos de recepción</strong><span>Información del ingreso al almacén</span></div>
-        <label class="rec-span-4">Fecha de recepción *<input type="date" name="received_at" value="{{ old('received_at',date('Y-m-d')) }}" required></label>
-        <label class="rec-span-4">Proveedor
-            <input name="supplier" list="registered-suppliers" value="{{ old('supplier') }}" placeholder="Escribe para buscar proveedor..." autocomplete="off">
-            <datalist id="registered-suppliers">@foreach($suppliers as $supplier)<option value="{{ $supplier->name }}">{{ $supplier->document_number }}{{ $supplier->trade_name ? ' · '.$supplier->trade_name : '' }}</option>@endforeach</datalist>
-            <small class="supplier-help">{{ $suppliers->count() }} proveedor(es) activo(s) registrado(s)</small>
-        </label>
-        <label class="rec-span-4">Almacén *<select name="warehouse" required><option>Almacén principal</option></select></label>
-        <label class="rec-span-8">Observaciones<textarea name="notes" rows="2" maxlength="1000" placeholder="Estado de entrega u observaciones">{{ old('notes') }}</textarea></label>
+        <div class="reception-field rec-span-4"><label for="reception-date">Fecha de recepción *</label><input id="reception-date" type="date" name="received_at" value="{{ old('received_at',date('Y-m-d')) }}" required><small aria-hidden="true">&nbsp;</small></div>
+        <div class="reception-field rec-span-4"><label for="reception-supplier">Proveedor</label>
+            <div class="supplier-autocomplete"><input id="reception-supplier" name="supplier" value="{{ old('supplier') }}" placeholder="Escribe al menos 2 letras..." autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="supplier-suggestions"><div class="supplier-suggestions" id="supplier-suggestions" role="listbox" hidden></div></div>
+            <small class="supplier-help">Escribe 2 letras o números · {{ $supplierCount }} proveedor(es) activo(s)</small>
+        </div>
+        <div class="reception-field rec-span-4"><label for="reception-warehouse">Almacén *</label><select id="reception-warehouse" name="warehouse" required><option>Almacén principal</option></select><small aria-hidden="true">&nbsp;</small></div>
+        <div class="reception-field reception-notes rec-span-8"><label for="reception-notes">Observaciones</label><textarea id="reception-notes" name="notes" rows="2" maxlength="1000" placeholder="Estado de entrega u observaciones">{{ old('notes') }}</textarea></div>
 
         <div class="form-section-title reception-doc-title"><strong>Documentos de sustento</strong><span>Formatos permitidos: PDF, JPG y PNG, hasta 10 MB por archivo</span></div>
         <div class="reception-document-row" data-document-type="guide" data-number-target="guide_number">
@@ -109,7 +108,55 @@
     const rows = dialog.querySelector('.reception-items');
     const template = document.getElementById('reception-item-template');
     const count = dialog.querySelector('.reception-item-count');
+    const supplierInput = dialog.querySelector('#reception-supplier');
+    const supplierSuggestions = dialog.querySelector('#supplier-suggestions');
+    let supplierTimer, supplierController, highlightedSupplier = -1;
     let nextIndex = 1;
+
+    const hideSuppliers = () => { supplierSuggestions.hidden = true; supplierInput.setAttribute('aria-expanded','false'); highlightedSupplier = -1; };
+    const selectSupplier = supplier => { supplierInput.value = supplier.name; hideSuppliers(); };
+    const highlightSupplier = index => {
+        const options = [...supplierSuggestions.querySelectorAll('button')];
+        if (!options.length) return;
+        highlightedSupplier = Math.max(0, Math.min(index, options.length - 1));
+        options.forEach((option, position) => option.classList.toggle('active', position === highlightedSupplier));
+        options[highlightedSupplier].scrollIntoView({block:'nearest'});
+    };
+    const renderSuppliers = suppliers => {
+        supplierSuggestions.innerHTML = '';
+        if (!suppliers.length) {
+            const empty = document.createElement('span'); empty.className='supplier-empty'; empty.textContent='No se encontraron proveedores activos.'; supplierSuggestions.appendChild(empty);
+        } else suppliers.forEach(supplier => {
+            const option = document.createElement('button'); option.type='button'; option.setAttribute('role','option');
+            const name = document.createElement('strong'); name.textContent=supplier.name;
+            const detail = document.createElement('small'); detail.textContent=[supplier.document_number,supplier.trade_name].filter(Boolean).join(' · ');
+            option.append(name,detail); option.addEventListener('mousedown',event=>event.preventDefault()); option.addEventListener('click',()=>selectSupplier(supplier)); supplierSuggestions.appendChild(option);
+        });
+        supplierSuggestions.hidden = false; supplierInput.setAttribute('aria-expanded','true'); highlightedSupplier=-1;
+    };
+    const searchSuppliers = () => {
+        clearTimeout(supplierTimer); supplierController?.abort();
+        const query = supplierInput.value.trim();
+        if (query.length < 2) { hideSuppliers(); return; }
+        supplierTimer = setTimeout(async () => {
+            supplierController = new AbortController();
+            try {
+                const response = await fetch(@json(route('product-receptions.suppliers.search'))+'?q='+encodeURIComponent(query), {headers:{'Accept':'application/json'},signal:supplierController.signal});
+                if (!response.ok) throw new Error();
+                renderSuppliers(await response.json());
+            } catch (error) { if (error.name !== 'AbortError') hideSuppliers(); }
+        }, 180);
+    };
+    supplierInput.addEventListener('input', searchSuppliers);
+    supplierInput.addEventListener('focus', () => { if (supplierInput.value.trim().length >= 2) searchSuppliers(); });
+    supplierInput.addEventListener('keydown', event => {
+        const options = supplierSuggestions.querySelectorAll('button');
+        if (event.key === 'ArrowDown' && options.length) { event.preventDefault(); highlightSupplier(highlightedSupplier + 1); }
+        else if (event.key === 'ArrowUp' && options.length) { event.preventDefault(); highlightSupplier(highlightedSupplier < 1 ? options.length - 1 : highlightedSupplier - 1); }
+        else if (event.key === 'Enter' && highlightedSupplier >= 0) { event.preventDefault(); options[highlightedSupplier].click(); }
+        else if (event.key === 'Escape') hideSuppliers();
+    });
+    supplierInput.addEventListener('blur', () => setTimeout(hideSuppliers, 120));
 
     const refresh = () => {
         const current = [...rows.querySelectorAll('.reception-item-row')];
