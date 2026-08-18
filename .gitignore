@@ -16,6 +16,7 @@
 /node_modules
 /public/fonts-manifest.dev.json
 /public/hot
+/releases/android/*.apk
 /public/storage
 /storage/*.key
 /storage/pail
