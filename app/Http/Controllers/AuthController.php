@@ -13,7 +13,8 @@ class AuthController extends Controller
         if (!Auth::attempt($credentials, $request->boolean('remember'))) return back()->withErrors(['email' => 'El correo o la contraseña no son correctos.'])->onlyInput('email');
         if (!Auth::user()->is_active) { Auth::logout(); return back()->withErrors(['email' => 'Este usuario está inactivo.']); }
         $request->session()->regenerate(); Auth::user()->update(['last_access_at' => now()]);
-        $first = Auth::user()->permissions[0] ?? 'products'; return redirect()->route($first === 'users' ? 'users.index' : $first.'.index');
+        if ($request->boolean('mobile')) return redirect()->route('mobile.daily-reports.index');
+        $first = Auth::user()->permissions[0] ?? 'products'; return redirect()->intended(route($first === 'users' ? 'users.index' : $first.'.index'));
     }
     public function logout(Request $request) { Auth::logout(); $request->session()->invalidate(); $request->session()->regenerateToken(); return redirect()->route('login'); }
 }

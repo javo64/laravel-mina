@@ -60,4 +60,18 @@ class DailyReportTest extends TestCase
         ])->assertRedirect(route('daily-reports.index'));
         $this->assertDatabaseHas('daily_reports', ['daily_report_form_id'=>$form->id,'user_id'=>$assigned->id]);
     }
+
+    public function test_mobile_app_only_lists_forms_assigned_to_the_user(): void
+    {
+        $creator = User::factory()->create(['permissions' => ['daily-reports','users']]);
+        $evaluator = User::factory()->create(['permissions' => ['daily-reports']]);
+        $assigned = DailyReportForm::create(['name'=>'Cartilla asignada','is_active'=>true,'created_by'=>$creator->id]);
+        $hidden = DailyReportForm::create(['name'=>'Cartilla de otro usuario','is_active'=>true,'created_by'=>$creator->id]);
+        $assigned->users()->attach($evaluator);
+
+        $this->actingAs($evaluator)->get(route('mobile.daily-reports.index'))
+            ->assertOk()->assertSee('Cartilla asignada')->assertDontSee('Cartilla de otro usuario');
+        $this->actingAs($evaluator)->get(route('mobile.daily-reports.fill', $assigned))->assertOk();
+        $this->actingAs($evaluator)->get(route('mobile.daily-reports.fill', $hidden))->assertForbidden();
+    }
 }

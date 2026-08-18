@@ -25,7 +25,7 @@
         <footer>Desarrollado por <strong>Javal Tecnología</strong></footer>
     </section>
     <section class="login-form">
-        <form method="post" action="{{ route('login.attempt') }}">@csrf
+        <form method="post" action="{{ route('login.attempt') }}">@csrf @if(request()->boolean('mobile'))<input type="hidden" name="mobile" value="1">@endif
             <div class="mobile-logo"><b>F</b><strong>FABULOSA</strong></div>
             <span>SISTEMA EN LA NUBE MINA</span>
             <h2>Inicia sesión</h2>
@@ -34,7 +34,7 @@
             <label>Correo electrónico<input type="email" name="email" value="{{ old('email') }}" required autofocus placeholder="usuario@empresa.com"></label>
             <label>Contraseña<input type="password" name="password" required placeholder="Ingresa tu contraseña"></label>
             <label class="remember"><input type="checkbox" name="remember"> Recordarme</label>
-            <button class="login-btn">Ingresar al dashboard →</button>
+            <button class="login-btn">{{ request()->boolean('mobile')?'Ingresar a mis cartillas →':'Ingresar al dashboard →' }}</button>
             <div class="demo"><strong>Acceso local inicial</strong><span>admin@mina.local</span><span>Contraseña: Admin2026</span></div>
         </form>
     </section>

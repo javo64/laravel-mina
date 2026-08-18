@@ -21,6 +21,11 @@
 /storage/pail
 /vendor
 /database/*.sql
+/mobile-android/.gradle
+/mobile-android/**/build
+/mobile-android/local.properties
+*.jks
+*.keystore
 _ide_helper.php
 Homestead.json
 Homestead.yaml

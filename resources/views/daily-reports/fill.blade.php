@@ -1,8 +1,8 @@
-@extends('layouts.app')
+@extends(($mobile??false) ? 'layouts.mobile' : 'layouts.app')
 @section('title',($preview?'Vista previa · ':'').$form->name)
 @section('content')
-<div class="daily-fill-head"><a href="{{ $preview?route('daily-reports.edit',$form):route('daily-reports.index') }}">←</a><div><span>{{ $preview?'PREVISUALIZACIÓN':'PARTE DIARIO DIGITAL' }}</span><h1>{{ $form->name }}</h1><p>{{ $form->description }}</p></div>@if($form->use_gps)<b>⌖ GPS obligatorio</b>@endif</div>
-<form class="daily-capture-form" method="post" enctype="multipart/form-data" action="{{ $preview?'#':route('daily-reports.submit',$form) }}" id="daily-capture">@csrf
+<div class="daily-fill-head"><a href="{{ $preview?route('daily-reports.edit',$form):(($mobile??false)?route('mobile.daily-reports.index'):route('daily-reports.index')) }}">←</a><div><span>{{ $preview?'PREVISUALIZACIÓN':'PARTE DIARIO DIGITAL' }}</span><h1>{{ $form->name }}</h1><p>{{ $form->description }}</p></div>@if($form->use_gps)<b>⌖ GPS obligatorio</b>@endif</div>
+<form class="daily-capture-form" method="post" enctype="multipart/form-data" action="{{ $preview?'#':(($mobile??false)?route('mobile.daily-reports.submit',$form):route('daily-reports.submit',$form)) }}" id="daily-capture">@csrf @if($mobile??false)<input type="hidden" name="mobile" value="1">@endif
     <input type="hidden" name="latitude" id="gps-latitude"><input type="hidden" name="longitude" id="gps-longitude">
     @if($form->use_gps)<div class="gps-status" id="gps-status"><span>⌖</span><div><strong>Obteniendo ubicación del equipo...</strong><small>Autoriza el acceso al GPS para registrar este parte.</small></div><button type="button" id="retry-gps">Reintentar</button></div>@endif
     @php($currentSection = null)

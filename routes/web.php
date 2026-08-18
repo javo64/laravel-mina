@@ -31,6 +31,7 @@ Route::get('/', function () {
         default => $module.'.index',
     });
 });
+Route::get('/movil', fn () => auth()->check() ? redirect()->route('mobile.daily-reports.index') : redirect()->route('login', ['mobile' => 1]))->name('mobile.home');
 Route::middleware('guest')->group(function () { Route::get('/login',[AuthController::class,'showLogin'])->name('login'); Route::post('/login',[AuthController::class,'login'])->name('login.attempt'); });
 Route::middleware('auth')->group(function () {
     Route::post('/logout',[AuthController::class,'logout'])->name('logout');
@@ -56,4 +57,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/parte-diario-digital/cartillas/{dailyReportForm}/previsualizar',[DailyReportController::class,'preview'])->name('daily-reports.preview');
     Route::get('/parte-diario-digital/cartillas/{dailyReportForm}/registrar',[DailyReportController::class,'fill'])->name('daily-reports.fill');
     Route::post('/parte-diario-digital/cartillas/{dailyReportForm}/registrar',[DailyReportController::class,'submit'])->name('daily-reports.submit');
+    Route::get('/movil/cartillas',[DailyReportController::class,'mobileIndex'])->name('mobile.daily-reports.index');
+    Route::get('/movil/cartillas/{dailyReportForm}',[DailyReportController::class,'mobileFill'])->name('mobile.daily-reports.fill');
+    Route::post('/movil/cartillas/{dailyReportForm}',[DailyReportController::class,'submit'])->name('mobile.daily-reports.submit');
 });

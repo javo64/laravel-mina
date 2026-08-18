@@ -106,6 +106,26 @@ class DailyReportController extends Controller
         return view('daily-reports.fill', ['form' => $dailyReportForm, 'preview' => false, 'areas' => Area::orderBy('name')->get()]);
     }
 
+    public function mobileIndex()
+    {
+        $this->allowed();
+        $user = auth()->user();
+        $forms = DailyReportForm::withCount(['fields','reports'])
+            ->where('is_active', true)
+            ->where(fn ($query) => $query->where('created_by', $user->id)
+                ->orWhereHas('users', fn ($users) => $users->whereKey($user->id)))
+            ->orderBy('name')->get();
+        $myReports = DailyReport::with('form')->where('user_id', $user->id)->latest('reported_at')->limit(5)->get();
+        return view('daily-reports.mobile-index', compact('forms', 'myReports'));
+    }
+
+    public function mobileFill(DailyReportForm $dailyReportForm)
+    {
+        $this->canFill($dailyReportForm);
+        $dailyReportForm->load('fields');
+        return view('daily-reports.fill', ['form' => $dailyReportForm, 'preview' => false, 'mobile' => true, 'areas' => Area::orderBy('name')->get()]);
+    }
+
     public function submit(Request $request, DailyReportForm $dailyReportForm)
     {
         $this->canFill($dailyReportForm);
@@ -140,7 +160,7 @@ class DailyReportController extends Controller
             $responses[$field->field_key] = $value;
         }
         DailyReport::create(['daily_report_form_id'=>$dailyReportForm->id,'user_id'=>auth()->id(),'reported_at'=>now(),'latitude'=>$request->latitude,'longitude'=>$request->longitude,'responses'=>$responses]);
-        return redirect()->route('daily-reports.index')->with('success', 'Parte diario registrado correctamente.');
+        return redirect()->route($request->boolean('mobile') ? 'mobile.daily-reports.index' : 'daily-reports.index')->with('success', 'Parte diario registrado correctamente.');
     }
 
     private function validatedForm(Request $request): array
