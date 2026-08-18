@@ -35,7 +35,8 @@ class ApprovalReviewTest extends TestCase
         $this->actingAs($approver)->get(route('approvals.index'))->assertOk()
             ->assertSee('Doble clic')->assertSee('approval-review-'.$requirement->id)
             ->assertSee('Filtro hidráulico')->assertSee(route('approvals.pdf', $requirement))
-            ->assertSee('Descargar PDF');
+            ->assertSee('Descargar PDF')->assertSee('sidebar-collapse')
+            ->assertSee('Contraer menú')->assertSee('data-label="Aprobaciones"', false);
 
         $pdf = $this->actingAs($approver)->get(route('approvals.pdf', $requirement));
         $pdf->assertOk()->assertHeader('content-type', 'application/pdf')
