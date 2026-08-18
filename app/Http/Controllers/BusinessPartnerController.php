@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\BusinessPartner;
+use App\Models\ProductReception;
 use App\Services\DocumentLookupService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -57,6 +58,17 @@ class BusinessPartnerController extends Controller
         $businessPartner->update($data);
 
         return back()->with('success', 'Cliente o proveedor actualizado.');
+    }
+
+    public function destroy(BusinessPartner $businessPartner)
+    {
+        abort_unless(auth()->user()->isAdministrator(), 403);
+        if (ProductReception::where('supplier', $businessPartner->name)->exists()) {
+            return back()->withErrors('No se puede eliminar el cliente o proveedor porque está vinculado a una recepción de productos.');
+        }
+        $businessPartner->delete();
+
+        return back()->with('success', 'Cliente o proveedor eliminado correctamente.');
     }
 
     private function validated(Request $request, ?BusinessPartner $partner = null): array

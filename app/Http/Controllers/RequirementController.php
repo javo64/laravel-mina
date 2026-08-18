@@ -71,4 +71,15 @@ class RequirementController extends Controller
 
         return back()->with('success', 'Requerimiento guardado como pendiente.');
     }
+
+    public function destroy(Requirement $requirement)
+    {
+        abort_unless(auth()->user()->isAdministrator(), 403);
+        if ($requirement->status !== 'Pendiente' || $requirement->decision_at || $requirement->decision_by) {
+            return back()->withErrors('No se puede eliminar el requerimiento porque ya tiene un proceso de aprobación vinculado.');
+        }
+        $requirement->delete();
+
+        return back()->with('success', 'Requerimiento eliminado correctamente.');
+    }
 }

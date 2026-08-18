@@ -14,7 +14,7 @@
 </div>
 <div class="card">
     <form class="toolbar"><label>⌕ <input name="q" value="{{ request('q') }}" placeholder="Buscar código, proveedor o documento..."></label><button>Buscar</button></form>
-    <div class="table-wrap"><table><thead><tr><th>Código</th><th>Fecha</th><th>Proveedor</th><th>Documentos</th><th>Almacén</th><th>Productos</th><th>Unidades</th><th>Recibido por</th></tr></thead><tbody>
+    <div class="table-wrap"><table><thead><tr><th>Código</th><th>Fecha</th><th>Proveedor</th><th>Documentos</th><th>Almacén</th><th>Productos</th><th>Unidades</th><th>Recibido por</th>@if(auth()->user()->isAdministrator())<th></th>@endif</tr></thead><tbody>
         @forelse($receptions as $reception)
         <tr>
             <td><code>{{ $reception->code }}</code></td>
@@ -30,9 +30,10 @@
             <td title="{{ $reception->items->pluck('product_name')->join(', ') }}">{{ $reception->items->count() }}</td>
             <td><strong>+{{ $reception->items->sum('quantity') }}</strong></td>
             <td>{{ $reception->receiver?->name ?? 'Usuario retirado' }}</td>
+            @if(auth()->user()->isAdministrator())<td><form method="post" action="{{ route('product-receptions.destroy',$reception) }}" onsubmit="return confirm('¿Eliminar esta recepción y revertir su movimiento de stock?')">@csrf @method('DELETE')<button class="danger">Eliminar</button></form></td>@endif
         </tr>
         @empty
-        <tr><td colspan="8" class="empty-state">Aún no hay recepciones registradas.</td></tr>
+        <tr><td colspan="{{ auth()->user()->isAdministrator()?9:8 }}" class="empty-state">Aún no hay recepciones registradas.</td></tr>
         @endforelse
     </tbody></table></div>{{ $receptions->links() }}
 </div>

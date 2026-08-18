@@ -19,8 +19,8 @@
 </div>
 <div class="card">
     <form class="toolbar"><label>⌕ <input name="q" value="{{ request('q') }}" placeholder="Buscar código, responsable o proyecto..."></label><button>Buscar</button></form>
-    <div class="table-wrap"><table><thead><tr><th>Código</th><th>Fecha</th><th>Responsable</th><th>Proyecto</th><th>Área</th><th>Ítems</th><th>Prioridad</th><th>Estado</th></tr></thead><tbody>
-        @foreach($requirements as $item)<tr><td><code>{{ $item->code }}</code></td><td>{{ $item->requested_at->format('d/m/Y') }}</td><td><strong>{{ $item->responsible }}</strong></td><td>{{ $item->project }}</td><td><em>{{ $item->area }}</em></td><td>{{ $item->items->count() }}</td><td>{{ $item->priority }}</td><td><span class="badge {{ strtolower($item->status) }}">{{ $item->status }}</span></td></tr>@endforeach
+    <div class="table-wrap"><table><thead><tr><th>Código</th><th>Fecha</th><th>Responsable</th><th>Proyecto</th><th>Área</th><th>Ítems</th><th>Prioridad</th><th>Estado</th>@if(auth()->user()->isAdministrator())<th></th>@endif</tr></thead><tbody>
+        @foreach($requirements as $item)<tr><td><code>{{ $item->code }}</code></td><td>{{ $item->requested_at->format('d/m/Y') }}</td><td><strong>{{ $item->responsible }}</strong></td><td>{{ $item->project }}</td><td><em>{{ $item->area }}</em></td><td>{{ $item->items->count() }}</td><td>{{ $item->priority }}</td><td><span class="badge {{ strtolower($item->status) }}">{{ $item->status }}</span></td>@if(auth()->user()->isAdministrator())<td>@if($item->status==='Pendiente' && ! $item->decision_at)<form method="post" action="{{ route('requirements.destroy',$item) }}" onsubmit="return confirm('¿Eliminar definitivamente este requerimiento?')">@csrf @method('DELETE')<button class="danger">Eliminar</button></form>@else<small title="Tiene una aprobación vinculada">Vinculado</small>@endif</td>@endif</tr>@endforeach
     </tbody></table></div>{{ $requirements->links() }}
 </div>
 

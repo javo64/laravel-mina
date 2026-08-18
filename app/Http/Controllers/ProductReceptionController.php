@@ -139,4 +139,35 @@ class ProductReceptionController extends Controller
 
         return response()->json($reader->analyze($data['document']));
     }
+
+    public function destroy(ProductReception $productReception)
+    {
+        abort_unless(auth()->user()->isAdministrator(), 403);
+        $files = array_filter([$productReception->guide_file, $productReception->invoice_file, $productReception->order_file]);
+
+        $deleted = DB::transaction(function () use ($productReception) {
+            $reception = ProductReception::with('items')->lockForUpdate()->findOrFail($productReception->id);
+            $products = [];
+            foreach ($reception->items as $item) {
+                $product = Product::lockForUpdate()->find($item->product_id);
+                if (! $product || (int) $product->stock !== (int) $item->stock_after) {
+                    return false;
+                }
+                $products[] = [$product, (int) $item->stock_before];
+            }
+            foreach ($products as [$product, $stockBefore]) {
+                $product->update(['stock' => $stockBefore]);
+            }
+            $reception->delete();
+
+            return true;
+        });
+
+        if (! $deleted) {
+            return back()->withErrors('No se puede eliminar la recepción porque sus productos ya tienen movimientos de stock posteriores.');
+        }
+        foreach ($files as $file) Storage::disk('public')->delete($file);
+
+        return back()->with('success', 'Recepción eliminada y stock revertido correctamente.');
+    }
 }

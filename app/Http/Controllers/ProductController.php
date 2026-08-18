@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Product;
 use App\Models\MeasurementUnit;
 use App\Models\ProductCategory;
+use App\Models\ProductReceptionItem;
+use App\Models\RequirementItem;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -45,9 +47,13 @@ class ProductController extends Controller
 
     public function destroy(Product $product)
     {
-        $this->allowed();
-        $product->update(['is_active' => false]);
-        return back()->with('success', 'Producto o servicio anulado.');
+        abort_unless(auth()->user()->isAdministrator(), 403);
+        if (RequirementItem::where('product_id', $product->id)->exists()
+            || ProductReceptionItem::where('product_id', $product->id)->exists()) {
+            return back()->withErrors('No se puede eliminar el producto o servicio porque está vinculado a un requerimiento o una recepción.');
+        }
+        $product->delete();
+        return back()->with('success', 'Producto o servicio eliminado correctamente.');
     }
 
     private function validated(Request $request, ?Product $product = null): array
