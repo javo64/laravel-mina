@@ -5,7 +5,7 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.CAMERA" />
-    <application android:allowBackup="false" android:usesCleartextTraffic="true" android:theme="@style/AppTheme" android:icon="@drawable/ic_launcher" android:label="Parte Diario Fabulosa">
+    <application android:allowBackup="false" android:usesCleartextTraffic="false" android:theme="@style/AppTheme" android:icon="@drawable/ic_launcher" android:label="Parte Diario Fabulosa">
         <activity android:name=".MainActivity" android:screenOrientation="portrait" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
