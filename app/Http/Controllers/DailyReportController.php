@@ -41,16 +41,29 @@ class DailyReportController extends Controller
         $this->allowed();
         $user = auth()->user();
         $forms = DailyReportForm::withCount(['fields','reports'])->with('creator')
+            ->when(! $user->canAccess('users'), fn ($query) => $query->where('created_by', $user->id))
+            ->when($request->q, fn ($q, $value) => $q->where('name', 'like', "%{$value}%"))
+            ->latest()->paginate(12);
+
+        return view('daily-reports.index', compact('forms'));
+    }
+
+    public function records(Request $request)
+    {
+        $this->allowed();
+        $user = auth()->user();
+        $forms = DailyReportForm::withCount(['fields','reports'])
+            ->where('is_active', true)
             ->when(! $user->canAccess('users'), fn ($query) => $query->where(fn ($q) => $q
                 ->where('created_by', $user->id)
                 ->orWhereHas('users', fn ($users) => $users->whereKey($user->id))))
             ->when($request->q, fn ($q, $value) => $q->where('name', 'like', "%{$value}%"))
-            ->latest()->paginate(12);
+            ->orderBy('name')->paginate(12);
         $recentReports = DailyReport::with(['form','user'])
             ->when(! $user->canAccess('users'), fn ($q) => $q->where('user_id', $user->id))
             ->latest('reported_at')->limit(8)->get();
 
-        return view('daily-reports.index', compact('forms', 'recentReports'));
+        return view('daily-reports.records', compact('forms', 'recentReports'));
     }
 
     public function create()
@@ -160,7 +173,7 @@ class DailyReportController extends Controller
             $responses[$field->field_key] = $value;
         }
         DailyReport::create(['daily_report_form_id'=>$dailyReportForm->id,'user_id'=>auth()->id(),'reported_at'=>now(),'latitude'=>$request->latitude,'longitude'=>$request->longitude,'responses'=>$responses]);
-        return redirect()->route($request->boolean('mobile') ? 'mobile.daily-reports.index' : 'daily-reports.index')->with('success', 'Parte diario registrado correctamente.');
+        return redirect()->route($request->boolean('mobile') ? 'mobile.daily-reports.index' : 'daily-reports.records')->with('success', 'Parte diario registrado correctamente.');
     }
 
     private function validatedForm(Request $request): array

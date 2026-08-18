@@ -57,7 +57,7 @@ class DailyReportTest extends TestCase
         $this->actingAs($assigned)->post(route('daily-reports.submit', $form), [
             'latitude' => '-12.046374', 'longitude' => '-77.042793',
             'responses' => ['observacion' => 'Operación normal'],
-        ])->assertRedirect(route('daily-reports.index'));
+        ])->assertRedirect(route('daily-reports.records'));
         $this->assertDatabaseHas('daily_reports', ['daily_report_form_id'=>$form->id,'user_id'=>$assigned->id]);
     }
 
@@ -69,6 +69,10 @@ class DailyReportTest extends TestCase
         $hidden = DailyReportForm::create(['name'=>'Cartilla de otro usuario','is_active'=>true,'created_by'=>$creator->id]);
         $assigned->users()->attach($evaluator);
 
+        $this->actingAs($evaluator)->get(route('daily-reports.index'))
+            ->assertOk()->assertDontSee('Cartilla asignada')->assertDontSee('Cartilla de otro usuario');
+        $this->actingAs($evaluator)->get(route('daily-reports.records'))
+            ->assertOk()->assertSee('Cartilla asignada')->assertDontSee('Cartilla de otro usuario');
         $this->actingAs($evaluator)->get(route('mobile.daily-reports.index'))
             ->assertOk()->assertSee('Cartilla asignada')->assertDontSee('Cartilla de otro usuario');
         $this->actingAs($evaluator)->get(route('mobile.daily-reports.fill', $assigned))->assertOk();
