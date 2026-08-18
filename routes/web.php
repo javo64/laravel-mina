@@ -51,6 +51,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/configuracion/api-documentos',[DocumentApiSettingController::class,'edit'])->name('settings.document-api.edit'); Route::put('/configuracion/api-documentos',[DocumentApiSettingController::class,'update'])->name('settings.document-api.update');
     Route::get('/parte-diario-digital',[DailyReportController::class,'index'])->name('daily-reports.index');
     Route::get('/parte-diario-digital/registro-cartillas',[DailyReportController::class,'records'])->name('daily-reports.records');
+    Route::get('/parte-diario-digital/registro-cartillas/exportar',[DailyReportController::class,'exportRecords'])->name('daily-reports.export');
     Route::get('/parte-diario-digital/cartillas/crear',[DailyReportController::class,'create'])->name('daily-reports.create');
     Route::post('/parte-diario-digital/cartillas',[DailyReportController::class,'store'])->name('daily-reports.store');
     Route::get('/parte-diario-digital/cartillas/{dailyReportForm}/editar',[DailyReportController::class,'edit'])->name('daily-reports.edit');

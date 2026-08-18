@@ -84,9 +84,9 @@ class DailyReportTest extends TestCase
     public function test_records_central_filters_reports_and_exposes_gps_points(): void
     {
         $admin = User::factory()->create(['permissions' => ['daily-reports','users']]);
-        $evaluator = User::factory()->create(['permissions' => ['daily-reports']]);
+        $evaluator = User::factory()->create(['name' => 'Evaluador Mina', 'permissions' => ['daily-reports']]);
         $form = DailyReportForm::create(['name'=>'Control con GPS','is_active'=>true,'created_by'=>$admin->id]);
-        DailyReport::create([
+        $report = DailyReport::create([
             'daily_report_form_id'=>$form->id,'user_id'=>$evaluator->id,'reported_at'=>'2026-08-18 10:30:00',
             'latitude'=>'-12.0463740','longitude'=>'-77.0427930','responses'=>['turno'=>'Día'],
         ]);
@@ -94,6 +94,47 @@ class DailyReportTest extends TestCase
         $this->actingAs($admin)->get(route('daily-reports.records', [
             'form_id'=>$form->id,'date'=>'2026-08-18','user_id'=>$evaluator->id,
         ]))->assertOk()->assertSee('Control con GPS')->assertSee($evaluator->name)
-            ->assertSee('-12.046374')->assertSee('Google Maps')->assertSee('Mapa de puntos registrados');
+            ->assertSee('-12.046374')->assertSee('Google Maps')->assertSee('Mapa de puntos registrados')
+            ->assertSee('record-detail-'.$report->id)->assertSee('Información completa enviada desde la cartilla')
+            ->assertSee('Día')->assertSee('Exportar Excel');
+    }
+
+    public function test_admin_can_export_filtered_records_as_a_valid_excel_file(): void
+    {
+        $admin = User::factory()->create(['permissions' => ['daily-reports','users']]);
+        $evaluator = User::factory()->create(['name' => 'Evaluador Mina', 'permissions' => ['daily-reports']]);
+        $form = DailyReportForm::create(['name'=>'Control con GPS','is_active'=>true,'created_by'=>$admin->id]);
+        $form->fields()->create(['field_key'=>'turno','name'=>'Turno','type'=>'text','section'=>'Datos generales']);
+
+        DailyReport::create([
+            'daily_report_form_id'=>$form->id,'user_id'=>$evaluator->id,'reported_at'=>'2026-08-18 10:30:00',
+            'latitude'=>'-12.0463740','longitude'=>'-77.0427930','responses'=>['turno'=>'Día'],
+        ]);
+        DailyReport::create([
+            'daily_report_form_id'=>$form->id,'user_id'=>$evaluator->id,'reported_at'=>'2026-08-17 10:30:00',
+            'responses'=>['turno'=>'Noche fuera del filtro'],
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('daily-reports.export', [
+            'form_id'=>$form->id,'date'=>'2026-08-18','user_id'=>$evaluator->id,
+        ]));
+
+        $response->assertOk()->assertHeader(
+            'content-type',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        );
+
+        $path = $response->baseResponse->getFile()->getPathname();
+        $zip = new \ZipArchive();
+        $this->assertTrue($zip->open($path) === true);
+        $sheet = $zip->getFromName('xl/worksheets/sheet1.xml');
+        $zip->close();
+
+        $this->assertIsString($sheet);
+        $this->assertStringContainsString('REGISTRO DE CARTILLAS', $sheet);
+        $this->assertStringContainsString('Control con GPS', $sheet);
+        $this->assertStringContainsString('Evaluador Mina', $sheet);
+        $this->assertStringContainsString('Día', $sheet);
+        $this->assertStringNotContainsString('Noche fuera del filtro', $sheet);
     }
 }

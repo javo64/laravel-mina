@@ -6,6 +6,7 @@ use App\Models\DailyReport;
 use App\Models\DailyReportForm;
 use App\Models\User;
 use App\Models\Area;
+use App\Services\DailyReportExcelExporter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -59,12 +60,7 @@ class DailyReportController extends Controller
                 ->orWhereHas('users', fn ($users) => $users->whereKey($user->id))))
             ->orderBy('name')->get();
 
-        $reportsQuery = DailyReport::query()
-            ->with(['form.fields','user'])
-            ->when(! $user->canAccess('users'), fn ($query) => $query->where('user_id', $user->id))
-            ->when($request->filled('form_id'), fn ($query) => $query->where('daily_report_form_id', $request->integer('form_id')))
-            ->when($request->filled('date'), fn ($query) => $query->whereDate('reported_at', $request->date('date')))
-            ->when($request->filled('user_id'), fn ($query) => $query->where('user_id', $request->integer('user_id')));
+        $reportsQuery = $this->filteredReports($request, $user)->with(['form.fields','user']);
 
         $totalReports = (clone $reportsQuery)->count();
         $gpsReports = (clone $reportsQuery)->whereNotNull('latitude')->whereNotNull('longitude')->count();
@@ -85,6 +81,19 @@ class DailyReportController extends Controller
         return view('daily-reports.records', compact(
             'availableForms','registeredForms','users','reports','mapPoints','totalReports','gpsReports','reportingUsers'
         ));
+    }
+
+    public function exportRecords(Request $request, DailyReportExcelExporter $exporter)
+    {
+        $this->allowed();
+        $reports = $this->filteredReports($request, auth()->user())
+            ->with(['form.fields','user'])->oldest('reported_at')->get();
+        $path = $exporter->create($reports);
+        $name = 'registros-cartillas-'.now()->format('Ymd-His').'.xlsx';
+
+        return response()->download($path, $name, [
+            'Content-Type'=>'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
     }
 
     public function create()
@@ -225,5 +234,14 @@ class DailyReportController extends Controller
                 'copy_previous'=>filter_var($field['copy_previous'] ?? false, FILTER_VALIDATE_BOOL),'position'=>$position,
             ]);
         }
+    }
+
+    private function filteredReports(Request $request, User $user)
+    {
+        return DailyReport::query()
+            ->when(! $user->canAccess('users'), fn ($query) => $query->where('user_id', $user->id))
+            ->when($request->filled('form_id'), fn ($query) => $query->where('daily_report_form_id', $request->integer('form_id')))
+            ->when($request->filled('date'), fn ($query) => $query->whereDate('reported_at', $request->date('date')))
+            ->when($request->filled('user_id'), fn ($query) => $query->where('user_id', $request->integer('user_id')));
     }
 }
