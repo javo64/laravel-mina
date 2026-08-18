@@ -17,32 +17,32 @@
         <div class="company" title="Fabulosa Company · {{ auth()->user()->branch }}"><span>FC</span><div><strong>Fabulosa Company</strong><small>{{ auth()->user()->branch }}</small></div></div>
         <nav aria-label="Módulos principales"><p>MÓDULOS</p>
             @if(auth()->user()->canAccess('products')||auth()->user()->canAccess('requirements')||auth()->user()->canAccess('approvals'))
-            <div class="module"><strong class="module-title" title="Almacén"><span class="module-icon">▦</span><span class="module-label">ALMACÉN</span></strong>
+            <div class="module" data-module="warehouse"><button class="module-title" type="button" title="Contraer Almacén" aria-expanded="true"><span class="module-icon">▦</span><span class="module-label">ALMACÉN</span><span class="module-chevron">⌃</span></button><div class="module-links">
                 @if(auth()->user()->canAccess('products'))
                 <a data-label="Productos y Servicios" title="Productos y Servicios" class="{{ request()->routeIs('products.*')?'active':'' }}" href="{{ route('products.index') }}"><span class="nav-icon">◈</span><span class="nav-label">Productos y Servicios</span></a>
                 <a data-label="Recepción de Productos" title="Recepción de Productos" class="{{ request()->routeIs('product-receptions.*')?'active':'' }}" href="{{ route('product-receptions.index') }}"><span class="nav-icon">↓</span><span class="nav-label">Recepción de Productos</span></a>
                 @endif
                 @if(auth()->user()->canAccess('requirements'))<a data-label="Requerimientos" title="Requerimientos" class="{{ request()->routeIs('requirements.*')?'active':'' }}" href="{{ route('requirements.index') }}"><span class="nav-icon">▤</span><span class="nav-label">Requerimientos</span></a>@endif
                 @if(auth()->user()->canAccess('approvals'))<a data-label="Aprobaciones" title="Aprobaciones" class="{{ request()->routeIs('approvals.*')?'active':'' }}" href="{{ route('approvals.index') }}"><span class="nav-icon">✓</span><span class="nav-label">Aprobaciones</span></a>@endif
-            </div>
+            </div></div>
             @endif
             @if(auth()->user()->canAccess('logistics'))
-            <div class="module"><strong class="module-title" title="Logística"><span class="module-icon">♜</span><span class="module-label">LOGÍSTICA</span></strong>
+            <div class="module" data-module="logistics"><button class="module-title" type="button" title="Contraer Logística" aria-expanded="true"><span class="module-icon">♜</span><span class="module-label">LOGÍSTICA</span><span class="module-chevron">⌃</span></button><div class="module-links">
                 <a data-label="Clientes y Proveedores" title="Clientes y Proveedores" class="{{ request()->routeIs('business-partners.*')?'active':'' }}" href="{{ route('business-partners.index') }}"><span class="nav-icon">♙</span><span class="nav-label">Clientes y Proveedores</span></a>
-            </div>
+            </div></div>
             @endif
             @if(auth()->user()->canAccess('daily-reports'))
-            <div class="module"><strong class="module-title" title="Parte Diario Digital"><span class="module-icon">▤</span><span class="module-label">PARTE DIARIO DIGITAL</span></strong>
+            <div class="module" data-module="daily-reports"><button class="module-title" type="button" title="Contraer Parte Diario Digital" aria-expanded="true"><span class="module-icon">▤</span><span class="module-label">PARTE DIARIO DIGITAL</span><span class="module-chevron">⌃</span></button><div class="module-links">
                 <a data-label="Creación de Cartillas" title="Creación de Cartillas" class="{{ request()->routeIs('daily-reports.index','daily-reports.create','daily-reports.edit','daily-reports.preview')?'active':'' }}" href="{{ route('daily-reports.index') }}"><span class="nav-icon">✚</span><span class="nav-label">Creación de Cartillas</span></a>
                 <a data-label="Registro de Cartillas" title="Registro de Cartillas" class="{{ request()->routeIs('daily-reports.records','daily-reports.fill')?'active':'' }}" href="{{ route('daily-reports.records') }}"><span class="nav-icon">◫</span><span class="nav-label">Registro de Cartillas</span></a>
-            </div>
+            </div></div>
             @endif
             @if(auth()->user()->canAccess('users'))
-            <div class="module admin"><strong class="module-title" title="Administración"><span class="module-icon">♙</span><span class="module-label">ADMINISTRACIÓN</span></strong>
+            <div class="module admin" data-module="administration"><button class="module-title" type="button" title="Contraer Administración" aria-expanded="true"><span class="module-icon">♙</span><span class="module-label">ADMINISTRACIÓN</span><span class="module-chevron">⌃</span></button><div class="module-links">
                 <a data-label="Usuarios" title="Usuarios" class="{{ request()->routeIs('users.*')?'active':'' }}" href="{{ route('users.index') }}"><span class="nav-icon">♟</span><span class="nav-label">Usuarios</span></a>
                 <a data-label="Configuración OpenAI" title="Configuración OpenAI" class="{{ request()->routeIs('settings.openai.*')?'active':'' }}" href="{{ route('settings.openai.edit') }}"><span class="nav-icon">✦</span><span class="nav-label">Configuración OpenAI</span></a>
                 <a data-label="API de documentos" title="API de documentos" class="{{ request()->routeIs('settings.document-api.*')?'active':'' }}" href="{{ route('settings.document-api.edit') }}"><span class="nav-icon">⌁</span><span class="nav-label">API de documentos</span></a>
-            </div>
+            </div></div>
             @endif
         </nav>
         <footer><span>Desarrollado por</span><strong>Javal Tecnología</strong></footer>
@@ -69,6 +69,28 @@
         const collapsed = !document.body.classList.contains('sidebar-collapsed');
         apply(collapsed);
         try { localStorage.setItem(key, collapsed ? '1' : '0'); } catch (_) {}
+    });
+    document.querySelectorAll('#sidebar .module[data-module]').forEach(module => {
+        const moduleToggle = module.querySelector(':scope > .module-title');
+        const moduleKey = `fabulosa-module-${module.dataset.module}-collapsed`;
+        const applyModule = collapsed => {
+            module.classList.toggle('module-collapsed', collapsed);
+            moduleToggle?.setAttribute('aria-expanded', String(!collapsed));
+            moduleToggle?.setAttribute('title', `${collapsed ? 'Expandir' : 'Contraer'} ${moduleToggle?.querySelector('.module-label')?.textContent.trim() || 'módulo'}`);
+            const chevron = moduleToggle?.querySelector('.module-chevron');
+            if (chevron) chevron.textContent = collapsed ? '⌄' : '⌃';
+        };
+        try { applyModule(localStorage.getItem(moduleKey) === '1'); } catch (_) {}
+        moduleToggle?.addEventListener('click', () => {
+            if (document.body.classList.contains('sidebar-collapsed') && window.innerWidth > 800) {
+                apply(false);
+                try { localStorage.setItem(key, '0'); } catch (_) {}
+                return;
+            }
+            const collapsed = !module.classList.contains('module-collapsed');
+            applyModule(collapsed);
+            try { localStorage.setItem(moduleKey, collapsed ? '1' : '0'); } catch (_) {}
+        });
     });
     document.querySelectorAll('#sidebar nav a').forEach(link => link.addEventListener('click', () => document.body.classList.remove('nav-open')));
     document.querySelectorAll('[data-close]').forEach(button => button.addEventListener('click', () => button.closest('dialog').close()));
