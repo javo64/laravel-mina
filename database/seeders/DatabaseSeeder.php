@@ -17,7 +17,7 @@ class DatabaseSeeder extends Seeder
     {
         User::updateOrCreate(
             ['email' => 'admin@mina.local'],
-            ['name'=>'Javier Alcántara','password'=>'Admin2026','branch'=>'Almacén principal','profile'=>'Administrador','is_active'=>true,'permissions'=>['products','requirements','approvals','logistics','users']]
+            ['name'=>'Javier Alcántara','password'=>'Admin2026','branch'=>'Almacén principal','profile'=>'Administrador','is_active'=>true,'permissions'=>['products','requirements','approvals','logistics','daily-reports','users']]
         );
     }
 }

@@ -14,6 +14,7 @@ use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\RequirementController;
 use App\Http\Controllers\ResponsibleController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\DailyReportController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -26,6 +27,7 @@ Route::get('/', function () {
     return redirect()->route(match ($module) {
         'users' => 'users.index',
         'logistics' => 'business-partners.index',
+        'daily-reports' => 'daily-reports.index',
         default => $module.'.index',
     });
 });
@@ -46,4 +48,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/configuracion/openai',[OpenAiSettingController::class,'edit'])->name('settings.openai.edit'); Route::put('/configuracion/openai',[OpenAiSettingController::class,'update'])->name('settings.openai.update');
     Route::get('/logistica/clientes-proveedores',[BusinessPartnerController::class,'index'])->name('business-partners.index'); Route::post('/logistica/clientes-proveedores/consultar',[BusinessPartnerController::class,'lookup'])->name('business-partners.lookup'); Route::post('/logistica/clientes-proveedores',[BusinessPartnerController::class,'store'])->name('business-partners.store'); Route::put('/logistica/clientes-proveedores/{businessPartner}',[BusinessPartnerController::class,'update'])->name('business-partners.update');
     Route::get('/configuracion/api-documentos',[DocumentApiSettingController::class,'edit'])->name('settings.document-api.edit'); Route::put('/configuracion/api-documentos',[DocumentApiSettingController::class,'update'])->name('settings.document-api.update');
+    Route::get('/parte-diario-digital',[DailyReportController::class,'index'])->name('daily-reports.index');
+    Route::get('/parte-diario-digital/cartillas/crear',[DailyReportController::class,'create'])->name('daily-reports.create');
+    Route::post('/parte-diario-digital/cartillas',[DailyReportController::class,'store'])->name('daily-reports.store');
+    Route::get('/parte-diario-digital/cartillas/{dailyReportForm}/editar',[DailyReportController::class,'edit'])->name('daily-reports.edit');
+    Route::put('/parte-diario-digital/cartillas/{dailyReportForm}',[DailyReportController::class,'update'])->name('daily-reports.update');
+    Route::get('/parte-diario-digital/cartillas/{dailyReportForm}/previsualizar',[DailyReportController::class,'preview'])->name('daily-reports.preview');
+    Route::get('/parte-diario-digital/cartillas/{dailyReportForm}/registrar',[DailyReportController::class,'fill'])->name('daily-reports.fill');
+    Route::post('/parte-diario-digital/cartillas/{dailyReportForm}/registrar',[DailyReportController::class,'submit'])->name('daily-reports.submit');
 });

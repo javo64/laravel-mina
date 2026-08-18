@@ -1,0 +1,46 @@
+@extends('layouts.app')
+@section('title',($preview?'Vista previa · ':'').$form->name)
+@section('content')
+<div class="daily-fill-head"><a href="{{ $preview?route('daily-reports.edit',$form):route('daily-reports.index') }}">←</a><div><span>{{ $preview?'PREVISUALIZACIÓN':'PARTE DIARIO DIGITAL' }}</span><h1>{{ $form->name }}</h1><p>{{ $form->description }}</p></div>@if($form->use_gps)<b>⌖ GPS obligatorio</b>@endif</div>
+<form class="daily-capture-form" method="post" enctype="multipart/form-data" action="{{ $preview?'#':route('daily-reports.submit',$form) }}" id="daily-capture">@csrf
+    <input type="hidden" name="latitude" id="gps-latitude"><input type="hidden" name="longitude" id="gps-longitude">
+    @if($form->use_gps)<div class="gps-status" id="gps-status"><span>⌖</span><div><strong>Obteniendo ubicación del equipo...</strong><small>Autoriza el acceso al GPS para registrar este parte.</small></div><button type="button" id="retry-gps">Reintentar</button></div>@endif
+    @php($currentSection = null)
+    @foreach($form->fields as $field)
+        @if($field->type === 'section')
+            @if($currentSection !== null)</div></section>@endif
+            @php($currentSection = $field->name)<section class="capture-section"><button type="button" class="capture-section-title"><span>▾</span><div><strong>{{ $field->name }}</strong><small>{{ $field->help_text }}</small></div></button><div class="capture-section-fields">
+        @else
+            @if($currentSection === null)@php($currentSection = $field->section)<section class="capture-section"><button type="button" class="capture-section-title"><span>▾</span><div><strong>{{ $field->section }}</strong><small>Complete los campos solicitados.</small></div></button><div class="capture-section-fields">@elseif($currentSection !== $field->section)</div></section>@php($currentSection = $field->section)<section class="capture-section"><button type="button" class="capture-section-title"><span>▾</span><div><strong>{{ $field->section }}</strong><small>Complete los campos solicitados.</small></div></button><div class="capture-section-fields">@endif
+            <label class="capture-field {{ in_array($field->type,['photo','signature'])?'wide':'' }}"><span>{{ $field->name }} @if($field->is_required)<b>*</b>@endif</span>@if($field->help_text)<small>{{ $field->help_text }}</small>@endif
+                @switch($field->type)
+                    @case('text') <textarea name="responses[{{ $field->field_key }}]" rows="3" {{ $field->is_required?'required':'' }}></textarea> @break
+                    @case('integer') <input class="formula-source" data-key="{{ $field->field_key }}" type="number" step="1" name="responses[{{ $field->field_key }}]" {{ $field->is_required?'required':'' }}> @break
+                    @case('decimal') <input class="formula-source" data-key="{{ $field->field_key }}" type="number" step="any" name="responses[{{ $field->field_key }}]" {{ $field->is_required?'required':'' }}> @break
+                    @case('date') <input type="date" name="responses[{{ $field->field_key }}]" value="{{ date('Y-m-d') }}" {{ $field->is_required?'required':'' }}> @break
+                    @case('time') <input type="time" name="responses[{{ $field->field_key }}]" value="{{ date('H:i') }}" {{ $field->is_required?'required':'' }}> @break
+                    @case('yes_no') <select name="responses[{{ $field->field_key }}]" {{ $field->is_required?'required':'' }}><option value="">Seleccione...</option><option>Sí</option><option>No</option></select> @break
+                    @case('select') <select name="responses[{{ $field->field_key }}]" {{ $field->is_required?'required':'' }}><option value="">Seleccione...</option>@foreach($field->options??[] as $option)<option>{{ $option }}</option>@endforeach</select> @break
+                    @case('multi_select') <div class="capture-options">@foreach($field->options??[] as $option)<label><input type="checkbox" name="responses[{{ $field->field_key }}][]" value="{{ $option }}"> {{ $option }}</label>@endforeach</div> @break
+                    @case('photo') <label class="photo-capture">📷 Tomar foto o adjuntar<input type="file" accept="image/*" capture="environment" name="responses[{{ $field->field_key }}]" {{ $field->is_required?'required':'' }}></label> @break
+                    @case('signature') <div class="signature-box"><canvas width="500" height="150" data-signature="{{ $field->field_key }}"></canvas><input type="hidden" name="responses[{{ $field->field_key }}]"><button type="button">Limpiar firma</button></div> @break
+                    @case('formula') <input class="formula-result" data-formula="{{ $field->formula }}" data-key="{{ $field->field_key }}" type="number" step="any" readonly name="responses[{{ $field->field_key }}]" placeholder="Se calculará automáticamente"> @break
+                    @case('qr') <input name="responses[{{ $field->field_key }}]" placeholder="Escanee o digite el código QR" {{ $field->is_required?'required':'' }}> @break
+                    @case('barcode') <input name="responses[{{ $field->field_key }}]" placeholder="Escanee o digite el código de barras" {{ $field->is_required?'required':'' }}> @break
+                @endswitch
+            </label>
+        @endif
+    @endforeach
+    @if($currentSection !== null)</div></section>@endif
+    <div class="capture-submit"><small>{{ $preview?'Esta es una vista previa; los datos no serán guardados.':'La fecha, hora y usuario se registrarán automáticamente.' }}</small><button class="primary" {{ $preview?'type=button disabled':'' }}>{{ $preview?'Modo previsualización':'Guardar parte diario' }}</button></div>
+</form>
+@endsection
+@push('scripts')
+<script>
+(()=>{const form=document.getElementById('daily-capture');document.querySelectorAll('.capture-section-title').forEach(b=>b.onclick=()=>b.closest('.capture-section').classList.toggle('collapsed'));
+function formulas(){const values={};document.querySelectorAll('.formula-source').forEach(x=>values[x.dataset.key]=Number(x.value)||0);document.querySelectorAll('.formula-result').forEach(x=>{try{let exp=(x.dataset.formula||'0').replace(/\{([a-zA-Z0-9_]+)\}/g,(_,k)=>String(values[k]??0));if(!/^[0-9+\-*/().\s]+$/.test(exp))throw 0;x.value=Function('return ('+exp+')')().toFixed(2)}catch(e){x.value=''}})}document.querySelectorAll('.formula-source').forEach(x=>x.addEventListener('input',formulas));formulas();
+document.querySelectorAll('[data-signature]').forEach(canvas=>{const ctx=canvas.getContext('2d');ctx.lineWidth=2;ctx.lineCap='round';let drawing=false;const point=e=>{const r=canvas.getBoundingClientRect(),p=e.touches?e.touches[0]:e;return{x:(p.clientX-r.left)*(canvas.width/r.width),y:(p.clientY-r.top)*(canvas.height/r.height)}};const start=e=>{drawing=true;const p=point(e);ctx.beginPath();ctx.moveTo(p.x,p.y);e.preventDefault()};const move=e=>{if(!drawing)return;const p=point(e);ctx.lineTo(p.x,p.y);ctx.stroke();e.preventDefault()};const stop=()=>{if(!drawing)return;drawing=false;canvas.parentElement.querySelector('input').value=canvas.toDataURL()};['mousedown','touchstart'].forEach(x=>canvas.addEventListener(x,start));['mousemove','touchmove'].forEach(x=>canvas.addEventListener(x,move));['mouseup','mouseleave','touchend'].forEach(x=>canvas.addEventListener(x,stop));canvas.parentElement.querySelector('button').onclick=()=>{ctx.clearRect(0,0,canvas.width,canvas.height);canvas.parentElement.querySelector('input').value=''}});
+@if($form->use_gps) const status=document.getElementById('gps-status');function gps(){status.className='gps-status';status.querySelector('strong').textContent='Obteniendo ubicación del equipo...';if(!navigator.geolocation){fail();return}navigator.geolocation.getCurrentPosition(p=>{document.getElementById('gps-latitude').value=p.coords.latitude;document.getElementById('gps-longitude').value=p.coords.longitude;status.classList.add('ready');status.querySelector('strong').textContent='Ubicación obtenida correctamente';status.querySelector('small').textContent=p.coords.latitude.toFixed(6)+', '+p.coords.longitude.toFixed(6)},fail,{enableHighAccuracy:true,timeout:12000})}function fail(){status.classList.add('error');status.querySelector('strong').textContent='No se pudo obtener la ubicación';status.querySelector('small').textContent='Activa el GPS y autoriza la ubicación en el navegador.'}document.getElementById('retry-gps').onclick=gps;gps();@endif
+})();
+</script>
+@endpush
