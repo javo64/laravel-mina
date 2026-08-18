@@ -52,18 +52,39 @@ class DailyReportController extends Controller
     {
         $this->allowed();
         $user = auth()->user();
-        $forms = DailyReportForm::withCount(['fields','reports'])
+        $availableForms = DailyReportForm::withCount(['fields','reports'])
             ->where('is_active', true)
             ->when(! $user->canAccess('users'), fn ($query) => $query->where(fn ($q) => $q
                 ->where('created_by', $user->id)
                 ->orWhereHas('users', fn ($users) => $users->whereKey($user->id))))
-            ->when($request->q, fn ($q, $value) => $q->where('name', 'like', "%{$value}%"))
-            ->orderBy('name')->paginate(12);
-        $recentReports = DailyReport::with(['form','user'])
-            ->when(! $user->canAccess('users'), fn ($q) => $q->where('user_id', $user->id))
-            ->latest('reported_at')->limit(8)->get();
+            ->orderBy('name')->get();
 
-        return view('daily-reports.records', compact('forms', 'recentReports'));
+        $reportsQuery = DailyReport::query()
+            ->with(['form.fields','user'])
+            ->when(! $user->canAccess('users'), fn ($query) => $query->where('user_id', $user->id))
+            ->when($request->filled('form_id'), fn ($query) => $query->where('daily_report_form_id', $request->integer('form_id')))
+            ->when($request->filled('date'), fn ($query) => $query->whereDate('reported_at', $request->date('date')))
+            ->when($request->filled('user_id'), fn ($query) => $query->where('user_id', $request->integer('user_id')));
+
+        $totalReports = (clone $reportsQuery)->count();
+        $gpsReports = (clone $reportsQuery)->whereNotNull('latitude')->whereNotNull('longitude')->count();
+        $reportingUsers = (clone $reportsQuery)->distinct()->count('user_id');
+        $mapPoints = (clone $reportsQuery)->whereNotNull('latitude')->whereNotNull('longitude')
+            ->latest('reported_at')->limit(1000)->get()->map(fn ($report) => [
+                'id'=>$report->id,'lat'=>(float)$report->latitude,'lng'=>(float)$report->longitude,
+                'form'=>$report->form->name,'user'=>$report->user->name,'date'=>$report->reported_at->format('d/m/Y H:i'),
+            ])->values();
+        $reports = $reportsQuery->latest('reported_at')->paginate(30)->withQueryString();
+        $registeredForms = DailyReportForm::whereHas('reports', fn ($query) => $query
+                ->when(! $user->canAccess('users'), fn ($reports) => $reports->where('user_id', $user->id)))
+            ->orderBy('name')->get(['id','name']);
+        $users = User::whereHas('dailyReports', fn ($query) => $query
+                ->when(! $user->canAccess('users'), fn ($reports) => $reports->where('user_id', $user->id)))
+            ->orderBy('name')->get(['id','name']);
+
+        return view('daily-reports.records', compact(
+            'availableForms','registeredForms','users','reports','mapPoints','totalReports','gpsReports','reportingUsers'
+        ));
     }
 
     public function create()

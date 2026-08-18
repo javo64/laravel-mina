@@ -35,4 +35,9 @@ class User extends Authenticatable
     {
         return in_array($module, $this->permissions ?? [], true);
     }
+
+    public function dailyReports()
+    {
+        return $this->hasMany(DailyReport::class);
+    }
 }

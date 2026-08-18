@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\DailyReport;
 use App\Models\DailyReportForm;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -77,5 +78,21 @@ class DailyReportTest extends TestCase
             ->assertOk()->assertSee('Cartilla asignada')->assertDontSee('Cartilla de otro usuario');
         $this->actingAs($evaluator)->get(route('mobile.daily-reports.fill', $assigned))->assertOk();
         $this->actingAs($evaluator)->get(route('mobile.daily-reports.fill', $hidden))->assertForbidden();
+    }
+
+    public function test_records_central_filters_reports_and_exposes_gps_points(): void
+    {
+        $admin = User::factory()->create(['permissions' => ['daily-reports','users']]);
+        $evaluator = User::factory()->create(['permissions' => ['daily-reports']]);
+        $form = DailyReportForm::create(['name'=>'Control con GPS','is_active'=>true,'created_by'=>$admin->id]);
+        DailyReport::create([
+            'daily_report_form_id'=>$form->id,'user_id'=>$evaluator->id,'reported_at'=>'2026-08-18 10:30:00',
+            'latitude'=>'-12.0463740','longitude'=>'-77.0427930','responses'=>['turno'=>'Día'],
+        ]);
+
+        $this->actingAs($admin)->get(route('daily-reports.records', [
+            'form_id'=>$form->id,'date'=>'2026-08-18','user_id'=>$evaluator->id,
+        ]))->assertOk()->assertSee('Control con GPS')->assertSee($evaluator->name)
+            ->assertSee('-12.046374')->assertSee('Google Maps')->assertSee('Mapa de puntos registrados');
     }
 }
