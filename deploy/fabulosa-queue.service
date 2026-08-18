@@ -1,0 +1,14 @@
+[Unit]
+Description=Cola Laravel de Fabulosa
+After=network.target mysql.service
+
+[Service]
+User=www-data
+Group=www-data
+Restart=always
+RestartSec=5
+WorkingDirectory=/var/www/fabulosa
+ExecStart=/usr/bin/php artisan queue:work --sleep=3 --tries=3 --timeout=120
+
+[Install]
+WantedBy=multi-user.target
