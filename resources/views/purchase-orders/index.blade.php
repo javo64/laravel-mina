@@ -31,10 +31,26 @@
 <dialog id="new-order-supplier"><div class="modal-head"><div><h2>Nuevo proveedor</h2><p>Se agregará a Clientes y Proveedores.</p></div><button type="button" data-close>×</button></div><form method="post" action="{{ route('purchase-orders.suppliers.store') }}">@csrf<div class="form-grid"><label>RUC *<input name="document_number" inputmode="numeric" maxlength="11" required></label><label>Razón social *<input name="name" required></label><label>Teléfono<input name="phone"></label><label>Correo<input name="email" type="email"></label></div><div class="modal-foot"><button type="button" data-close>Cancelar</button><button class="primary">Guardar proveedor</button></div></form></dialog>
 <dialog id="new-bank-account"><div class="modal-head"><div><h2>Nueva cuenta bancaria</h2><p>Registra la cuenta para seleccionarla en la orden.</p></div><button type="button" data-close>×</button></div><form method="post" action="{{ route('purchase-orders.bank-accounts.store') }}">@csrf<div class="form-grid"><label>Proveedor asociado<select name="business_partner_id"><option value="">No asociado</option>@foreach($suppliers as $supplier)<option value="{{ $supplier->id }}">{{ $supplier->name }}</option>@endforeach</select></label><label>Tipo de cuenta *<select name="account_type"><option>Cuenta Corriente</option><option>Cuenta Interbancaria</option></select></label><label>Número de cuenta *<input name="account_number" required></label><label>Banco *<input name="bank_name" required></label><label>Titular<input name="holder_name"></label><label>Moneda *<select name="currency"><option value="PEN">Soles</option><option value="USD">Dólar</option></select></label></div><div class="modal-foot"><button type="button" data-close>Cancelar</button><button class="primary">Guardar cuenta</button></div></form></dialog>
 @endsection
+@php
+    $approvedOrderData = $approvedRequirements->map(function ($requirement) {
+        return [
+            'id' => $requirement->id,
+            'code' => $requirement->code,
+            'area' => $requirement->area,
+            'items' => $requirement->items->map(function ($item) {
+                return [
+                    'id' => $item->id, 'name' => $item->product_name, 'description' => $item->description,
+                    'quantity' => (float) $item->quantity, 'unit' => $item->unit,
+                    'price' => (float) optional($item->product)->price,
+                ];
+            })->values(),
+        ];
+    })->values();
+@endphp
 @push('scripts')
 <script>
 (() => {
-    const data = @json($approvedRequirements->map(fn($requirement) => ['id'=>$requirement->id,'code'=>$requirement->code,'area'=>$requirement->area,'items'=>$requirement->items->map(fn($item) => ['id'=>$item->id,'name'=>$item->product_name,'description'=>$item->description,'quantity'=>(float)$item->quantity,'unit'=>$item->unit,'price'=>(float)optional($item->product)->price])])->values());
+    const data = @json($approvedOrderData);
     const dialog=document.getElementById('new-purchase-order'), rows=document.getElementById('purchase-order-items'), selector=document.getElementById('approved-requirement');
     const money=value => `${document.getElementById('po-currency').value==='USD'?'US$':'S/'} ${Number(value||0).toFixed(2)}`;
     const refresh=()=>{const exempt=document.getElementById('po-tax-exempt').checked;let subtotal=0;[...rows.children].forEach((row,index)=>{row.querySelector('.po-row-number').textContent=index+1;const quantity=Number(row.querySelector('[name$="[quantity]"]').value)||0,price=Number(row.querySelector('[name$="[unit_price]"]').value)||0,total=quantity*price;row.querySelector('.po-line-total').textContent=money(total);subtotal+=total;});const tax=exempt?0:subtotal*.18;document.getElementById('po-subtotal').textContent=money(subtotal);document.getElementById('po-tax').textContent=money(tax);document.getElementById('po-total').textContent=money(subtotal+tax);document.getElementById('po-item-count').textContent=`${rows.children.length} ${rows.children.length===1?'ítem':'ítems'}`};

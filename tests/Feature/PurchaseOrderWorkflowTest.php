@@ -21,6 +21,9 @@ class PurchaseOrderWorkflowTest extends TestCase
         $requirement = Requirement::create(['code'=>'REQ-OC-001', 'requested_at'=>'2026-08-20', 'responsible'=>'Javier', 'project'=>'Fabulosa', 'area'=>'LOGISTICA', 'priority'=>'Media', 'status'=>'Aprobado']);
         $item = $requirement->items()->create(['product_name'=>'Válvula', 'quantity'=>2, 'unit'=>'Unidad', 'priority'=>'Media', 'approval_status'=>'Aprobado']);
 
+        $this->actingAs($user)->get(route('purchase-orders.index'))
+            ->assertOk()->assertSee('Órdenes de compra')->assertSee('REQ-OC-001')->assertSee('Jalar productos');
+
         $this->actingAs($user)->post(route('purchase-orders.store'), [
             'destination_branch'=>'Sucursal principal', 'destination_warehouse'=>'Almacén principal', 'document'=>'OCO', 'series'=>'001', 'number'=>'000001',
             'supplier_id'=>$supplier->id, 'bank_account_id'=>$account->id, 'payment_condition'=>'001 CONTADO', 'currency'=>'PEN', 'area'=>'LOGISTICA',
