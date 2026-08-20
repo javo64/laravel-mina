@@ -22,15 +22,22 @@ class PurchaseOrderWorkflowTest extends TestCase
         $item = $requirement->items()->create(['product_name'=>'Válvula', 'quantity'=>2, 'unit'=>'Unidad', 'priority'=>'Media', 'approval_status'=>'Aprobado']);
 
         $this->actingAs($user)->get(route('purchase-orders.index'))
-            ->assertOk()->assertSee('Órdenes de compra')->assertSee('REQ-OC-001')->assertSee('Jalar productos');
+            ->assertOk()->assertSee('Órdenes de compra')->assertSee('REQ-OC-001')->assertSee('Seleccionar productos aprobados')
+            ->assertSee('OCO: 001/002 · OS: 003/004');
 
         $this->actingAs($user)->post(route('purchase-orders.store'), [
-            'destination_branch'=>'Sucursal principal', 'destination_warehouse'=>'Almacén principal', 'document'=>'OCO', 'series'=>'001', 'number'=>'000001',
+            'destination_branch'=>'Sucursal principal', 'destination_warehouse'=>'Almacén principal', 'document'=>'OCO', 'series'=>'001',
             'supplier_id'=>$supplier->id, 'bank_account_id'=>$account->id, 'payment_condition'=>'001 CONTADO', 'currency'=>'PEN', 'area'=>'LOGISTICA',
             'items'=>[['requirement_item_id'=>$item->id, 'cost_center'=>'CC-001', 'quantity'=>2, 'unit_price'=>100]],
         ])->assertRedirect(route('purchase-orders.index'));
 
         $this->assertDatabaseHas('purchase_orders', ['document'=>'OCO', 'series'=>'001', 'number'=>'000001', 'subtotal'=>200, 'tax'=>36, 'total'=>236]);
         $this->assertDatabaseHas('purchase_order_items', ['requirement_item_id'=>$item->id, 'cost_center'=>'CC-001', 'total'=>200]);
+
+        $this->actingAs($user)->get(route('purchase-orders.next-correlative', ['document' => 'OCO', 'series' => '001']))
+            ->assertOk()->assertJsonPath('number', '000002');
+        $order = \App\Models\PurchaseOrder::firstOrFail();
+        $this->actingAs($user)->get(route('purchase-orders.pdf', $order))->assertOk()
+            ->assertHeader('content-type', 'application/pdf')->assertSee('FABULOSA', false);
     }
 }

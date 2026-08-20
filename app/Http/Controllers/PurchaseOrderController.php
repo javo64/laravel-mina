@@ -11,6 +11,7 @@ use App\Models\RequirementItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use App\Services\PurchaseOrderPdfGenerator;
 
 class PurchaseOrderController extends Controller
 {
@@ -43,8 +44,7 @@ class PurchaseOrderController extends Controller
             'destination_branch' => ['required', 'max:255'],
             'destination_warehouse' => ['required', 'max:255'],
             'document' => ['required', Rule::in(['OCO', 'OS'])],
-            'series' => ['required', 'max:10'],
-            'number' => ['required', 'max:20', Rule::unique('purchase_orders')->where(fn ($query) => $query->where('document', $request->document)->where('series', $request->series))],
+            'series' => ['required', Rule::in($this->availableSeries($request->document))],
             'supplier_id' => ['required', Rule::exists('business_partners', 'id')->where('is_active', true)],
             'bank_account_id' => ['nullable', Rule::exists('bank_accounts', 'id')->where('is_active', true)],
             'payment_condition' => ['required', Rule::in(['001 CONTADO', '002 CREDITO 07 DIAS', '003 CREDITO 15 DIAS'])],
@@ -68,11 +68,12 @@ class PurchaseOrderController extends Controller
             });
             $subtotal = $lines->sum(fn ($line) => $line['quantity'] * $line['unit_price']);
             $tax = ! empty($data['tax_exempt']) ? 0 : round($subtotal * .18, 2);
-            $sequence = (PurchaseOrder::max('id') ?? 0) + 1;
+            $number = $this->nextNumber($data['document'], $data['series'], true);
             $order = PurchaseOrder::create([
                 ...collect($data)->except('items')->all(),
                 'tax_exempt' => ! empty($data['tax_exempt']),
-                'code' => $data['document'].'-'.now()->year.'-'.str_pad((string) $sequence, 4, '0', STR_PAD_LEFT),
+                'number' => $number,
+                'code' => $data['document'].'-'.$data['series'].'-'.$number,
                 'subtotal' => $subtotal, 'tax' => $tax, 'total' => $subtotal + $tax,
                 'status' => 'Emitida', 'created_by' => auth()->id(),
             ]);
@@ -89,6 +90,28 @@ class PurchaseOrderController extends Controller
         });
 
         return redirect()->route('purchase-orders.index')->with('success', 'Orden registrada correctamente.');
+    }
+
+    public function nextCorrelative(Request $request)
+    {
+        $this->allowed();
+        $document = $request->validate(['document' => ['required', Rule::in(['OCO', 'OS'])]])['document'];
+        $series = $request->validate(['series' => ['required', Rule::in($this->availableSeries($document))]])['series'];
+
+        return response()->json(['number' => $this->nextNumber($document, $series)]);
+    }
+
+    public function pdf(Request $request, PurchaseOrder $purchaseOrder, PurchaseOrderPdfGenerator $generator)
+    {
+        $this->allowed();
+        $disposition = $request->boolean('download') ? 'attachment' : 'inline';
+        $filename = strtolower($purchaseOrder->document).'-'.$purchaseOrder->series.'-'.$purchaseOrder->number.'.pdf';
+
+        return response($generator->render($purchaseOrder), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => $disposition.'; filename="'.$filename.'"',
+            'Cache-Control' => 'private, max-age=60',
+        ]);
     }
 
     public function storeSupplier(Request $request)
@@ -113,5 +136,21 @@ class PurchaseOrderController extends Controller
         ]);
         BankAccount::create([...$data, 'is_active' => true]);
         return back()->with('success', 'Cuenta bancaria registrada. Ya puedes seleccionarla en la orden.');
+    }
+
+    private function availableSeries(?string $document): array
+    {
+        return $document === 'OS' ? ['003', '004'] : ['001', '002'];
+    }
+
+    private function nextNumber(string $document, string $series, bool $lock = false): string
+    {
+        $query = PurchaseOrder::where('document', $document)->where('series', $series);
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+        $last = $query->pluck('number')->map(fn ($number) => (int) $number)->max() ?? 0;
+
+        return str_pad((string) ($last + 1), 6, '0', STR_PAD_LEFT);
     }
 }
