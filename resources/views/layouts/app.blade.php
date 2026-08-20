@@ -29,6 +29,7 @@
             @if(auth()->user()->canAccess('logistics'))
             <div class="module" data-module="logistics"><button class="module-title" type="button" title="Contraer Logística" aria-expanded="true"><span class="module-icon">♜</span><span class="module-label">LOGÍSTICA</span><span class="module-chevron">⌃</span></button><div class="module-links">
                 <a data-label="Clientes y Proveedores" title="Clientes y Proveedores" class="{{ request()->routeIs('business-partners.*')?'active':'' }}" href="{{ route('business-partners.index') }}"><span class="nav-icon">♙</span><span class="nav-label">Clientes y Proveedores</span></a>
+                <a data-label="Órdenes de compra" title="Órdenes de compra" class="{{ request()->routeIs('purchase-orders.*')?'active':'' }}" href="{{ route('purchase-orders.index') }}"><span class="nav-icon">▤</span><span class="nav-label">Órdenes de compra</span></a>
             </div></div>
             @endif
             @if(auth()->user()->canAccess('daily-reports'))

@@ -28,15 +28,26 @@ class ApprovalController extends Controller
             ->selectRaw('approval_status, count(*) as total')
             ->groupBy('approval_status')
             ->pluck('total', 'approval_status');
-        $items = RequirementItem::with(['requirement.decisionMaker', 'requirement.items.decisionMaker', 'decisionMaker'])
-            ->when($activeStatus !== 'Todos', fn ($query) => $query->where('approval_status', $activeStatus))
-            ->latest('updated_at')
-            ->latest('id')
-            ->paginate(12)
-            ->withQueryString();
-        $requirements = $items->getCollection()->pluck('requirement')->filter()->unique('id');
+        $totalRequirements = Requirement::whereHas('items')->count();
+        $items = null;
+        if ($activeStatus === 'Todos') {
+            $requirements = Requirement::with(['items.decisionMaker'])
+                ->whereHas('items')
+                ->latest('requested_at')
+                ->latest('id')
+                ->paginate(12)
+                ->withQueryString();
+        } else {
+            $items = RequirementItem::with(['requirement.decisionMaker', 'requirement.items.decisionMaker', 'decisionMaker'])
+                ->where('approval_status', $activeStatus)
+                ->latest('updated_at')
+                ->latest('id')
+                ->paginate(12)
+                ->withQueryString();
+            $requirements = $items->getCollection()->pluck('requirement')->filter()->unique('id');
+        }
 
-        return view('approvals.index', compact('items', 'requirements', 'activeStatus', 'counts'));
+        return view('approvals.index', compact('items', 'requirements', 'activeStatus', 'counts', 'totalRequirements'));
     }
 
     public function decideItem(Request $request, RequirementItem $requirementItem)

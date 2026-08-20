@@ -15,13 +15,24 @@
 <nav class="approval-state-tabs" aria-label="Estados de aprobación">
 @foreach($tabs as $status=>$tab)
     <a href="{{ route('approvals.index',['estado'=>$status]) }}" class="{{ $activeStatus===$status?'active':'' }} status-{{ strtolower($status) }}">
-        <span>{{ $tab['icon'] }}</span><div><strong>{{ $tab['label'] }}</strong><small>{{ $tab['help'] }}</small></div><b>{{ $status==='Todos' ? $items->total() : ($counts[$status] ?? 0) }}</b>
+        <span>{{ $tab['icon'] }}</span><div><strong>{{ $tab['label'] }}</strong><small>{{ $tab['help'] }}</small></div><b>{{ $status==='Todos' ? $totalRequirements : ($counts[$status] ?? 0) }}</b>
     </a>
 @endforeach
 </nav>
 
 <div class="card approval-items-board">
-    <header><div><h2>{{ $tabs[$activeStatus]['label'] }}</h2><p>{{ $tabs[$activeStatus]['help'] }} · doble clic para revisar el requerimiento completo</p></div><span class="badge {{ strtolower($activeStatus) }}">{{ $items->total() }} ítem(s)</span></header>
+    <header><div><h2>{{ $tabs[$activeStatus]['label'] }}</h2><p>{{ $tabs[$activeStatus]['help'] }} · doble clic para revisar el requerimiento completo</p></div><span class="badge {{ strtolower($activeStatus) }}">{{ $activeStatus==='Todos' ? $requirements->total().' requerimiento(s)' : $items->total().' ítem(s)' }}</span></header>
+    @if($activeStatus==='Todos')
+    <div class="table-wrap"><table><thead><tr><th>Requerimiento</th><th>Fecha</th><th>Solicitante</th><th>Proyecto / área</th><th>Ítems</th><th>Pendientes</th><th>Aprobados</th><th>Anulados</th><th>Estado general</th></tr></thead><tbody>
+    @forelse($requirements as $requirement)
+        @php($grouped=$requirement->items->countBy('approval_status'))
+        <tr class="approval-review-row" tabindex="0" data-requirement-id="{{ $requirement->id }}" title="Doble clic para revisar {{ $requirement->code }}"><td><code>{{ $requirement->code }}</code></td><td>{{ $requirement->requested_at->format('d/m/Y') }}</td><td>{{ $requirement->responsible }}</td><td><strong>{{ $requirement->project }}</strong><small>{{ $requirement->area ?: 'Sin área' }}</small></td><td>{{ $requirement->items->count() }}</td><td>{{ $grouped['Pendiente'] ?? 0 }}</td><td>{{ $grouped['Aprobado'] ?? 0 }}</td><td>{{ $grouped['Anulado'] ?? 0 }}</td><td><span class="badge {{ strtolower($requirement->status) }}">{{ $requirement->status }}</span></td></tr>
+    @empty
+        <tr><td colspan="9"><div class="empty-state"><b>▤</b><p>No hay requerimientos registrados.</p></div></td></tr>
+    @endforelse
+    </tbody></table></div>
+    {{ $requirements->links() }}
+    @else
     <div class="table-wrap"><table><thead><tr><th>Requerimiento</th><th>Producto / servicio</th><th>Cantidad</th><th>Solicitante</th><th>Proyecto / área</th><th>Estado</th><th>Decidido por</th></tr></thead><tbody>
     @forelse($items as $detail)
         @php($requirement=$detail->requirement)
@@ -39,6 +50,7 @@
     @endforelse
     </tbody></table></div>
     {{ $items->links() }}
+    @endif
 </div>
 
 @foreach($requirements as $requirement)
@@ -52,7 +64,7 @@
         </section>
         <section class="approval-pdf-pane"><div class="approval-pdf-toolbar"><div><strong>Documento PDF</strong><small>Vista generada desde el requerimiento</small></div><a href="{{ route('approvals.pdf',[$requirement,'download'=>1]) }}">⇩ Descargar PDF</a></div><iframe title="PDF del requerimiento {{ $requirement->code }}" data-src="{{ route('approvals.pdf',$requirement) }}#toolbar=1&navpanes=0&view=FitH"></iframe></section>
     </div>
-    <footer><button type="button" data-close>Cerrar</button><div class="approval-modal-actions"><form method="post" action="{{ route('approvals.decide',$requirement) }}">@csrf<input type="hidden" name="status" value="Aprobado"><button class="approve" type="submit">✓ Aprobar total</button></form></div></footer>
+    <footer><button type="button" data-close>Cerrar</button><div class="approval-modal-actions"><form method="post" action="{{ route('approvals.decide',$requirement) }}">@csrf<input type="hidden" name="status" value="Anulado"><button class="reject" type="submit">⊘ Anular total</button></form><form method="post" action="{{ route('approvals.decide',$requirement) }}">@csrf<input type="hidden" name="status" value="Aprobado"><button class="approve" type="submit">✓ Aprobar total</button></form></div></footer>
 </dialog>
 @endforeach
 @endsection
