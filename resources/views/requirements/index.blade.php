@@ -64,19 +64,20 @@
     <div class="modal-head product-modal-head"><span class="modal-icon">▤</span><div><h2>Nuevo requerimiento</h2><p>Ingresa los datos generales y selecciona productos registrados.</p></div><button type="button" data-close>×</button></div>
     <div class="requirement-form">
         <div class="form-section-title"><strong>Información del requerimiento</strong><span>Datos del solicitante y destino</span></div>
-        <label class="req-span-8">Responsable *<select name="responsible" required><option value="">Seleccionar responsable</option>@foreach($responsibles as $responsible)<option value="{{ $responsible->name }}">{{ $responsible->name }}{{ $responsible->position ? ' · '.$responsible->position : '' }}</option>@endforeach</select></label>
+        <label class="req-span-8">Responsable *<select name="responsible" id="requirement-responsible" required><option value="">Seleccionar responsable</option>@foreach($responsibles as $responsible)<option value="{{ $responsible->name }}">{{ $responsible->name }}{{ $responsible->position ? ' · '.$responsible->position : '' }}</option>@endforeach<option value="__new__">＋ Agregar nuevo responsable</option></select></label>
         <label class="req-span-4">Fecha *<input type="date" name="requested_at" value="{{ date('Y-m-d') }}" required></label>
-        <label class="req-span-4">Mina / proyecto *<select name="project" required><option value="">Seleccionar proyecto</option>@foreach($projects as $project)<option value="{{ $project->name }}">{{ $project->name }}{{ $project->code ? ' · '.$project->code : '' }}</option>@endforeach</select></label>
-        <label class="req-span-4">Área solicitante *<select name="area" required><option value="">Seleccionar área</option>@foreach($areas as $area)<option value="{{ $area->name }}">{{ $area->name }}</option>@endforeach</select></label>
+        <label class="req-span-4">Mina / proyecto *<select name="project" required><option value="">Seleccionar proyecto</option>@foreach($projects as $project)<option value="{{ $project->name }}" {{ $project->name === 'MINA CAROLINA JE' ? 'selected' : '' }}>{{ $project->name }}{{ $project->code ? ' · '.$project->code : '' }}</option>@endforeach</select></label>
+        <label class="req-span-4">Área solicitante *<select name="area" id="requirement-area" required><option value="">Seleccionar área</option>@foreach($areas as $area)<option value="{{ $area->name }}">{{ $area->name }}</option>@endforeach<option value="__new__">＋ Agregar nueva área</option></select></label>
 
         <div class="requested-products-title"><div><strong>Productos solicitados</strong><span class="item-count">1 ítem</span><small>Busca entre {{ $products->count() }} productos registrados</small></div><button class="secondary add-item" type="button">＋ Agregar fila</button></div>
         <div class="requirement-items-wrap">
-            <div class="requirement-item-head"><span>N°</span><span>Rubro</span><span>Producto registrado</span><span></span><span>Descripción</span><span>Cantidad</span><span>Unidad</span><span>Prioridad</span><span></span></div>
+            <div class="requirement-item-head"><span>N°</span><span>Rubro</span><span>Producto registrado</span><span></span><span>Centro de costos</span><span>Descripción</span><span>Cantidad</span><span>Unidad</span><span>Prioridad</span><span></span></div>
             <div class="requirement-items">
                 <div class="requirement-item-row">
                     <span class="row-number">1</span><input class="item-category" value="Automático" readonly>
                     <select class="item-product" name="items[0][product_id]" required><option value="">Buscar producto...</option>@foreach($products as $product)<option value="{{ $product->id }}" data-category="{{ $product->category ?: 'Sin rubro' }}" data-unit="{{ $product->unit }}">{{ $product->name }}</option>@endforeach</select>
                     <button class="new-product-inline" type="button" title="Crear producto">＋</button>
+                    <select name="items[0][cost_center_id]" required><option value="">Seleccionar centro...</option>@foreach($costCenters as $costCenter)<option value="{{ $costCenter->id }}">{{ $costCenter->parent->name }} · {{ $costCenter->name }}</option>@endforeach</select>
                     <input name="items[0][description]" placeholder="Detalle o especificación">
                     <input type="number" step="0.01" min="0.01" name="items[0][quantity]" value="1" required>
                     <input class="item-unit" value="Unidad" readonly>
@@ -92,7 +93,7 @@
 <template id="requirement-item-template"><div class="requirement-item-row">
     <span class="row-number">__NUMBER__</span><input class="item-category" value="Automático" readonly>
     <select class="item-product" name="items[__INDEX__][product_id]" required><option value="">Buscar producto...</option>@foreach($products as $product)<option value="{{ $product->id }}" data-category="{{ $product->category ?: 'Sin rubro' }}" data-unit="{{ $product->unit }}">{{ $product->name }}</option>@endforeach</select>
-    <button class="new-product-inline" type="button" title="Crear producto">＋</button><input name="items[__INDEX__][description]" placeholder="Detalle o especificación"><input type="number" step="0.01" min="0.01" name="items[__INDEX__][quantity]" value="1" required><input class="item-unit" value="Unidad" readonly><select name="items[__INDEX__][priority]" required><option>Alta</option><option selected>Media</option><option>Baja</option></select><button class="remove-item" type="button" title="Quitar fila">×</button>
+    <button class="new-product-inline" type="button" title="Crear producto">＋</button><select name="items[__INDEX__][cost_center_id]" required><option value="">Seleccionar centro...</option>@foreach($costCenters as $costCenter)<option value="{{ $costCenter->id }}">{{ $costCenter->parent->name }} · {{ $costCenter->name }}</option>@endforeach</select><input name="items[__INDEX__][description]" placeholder="Detalle o especificación"><input type="number" step="0.01" min="0.01" name="items[__INDEX__][quantity]" value="1" required><input class="item-unit" value="Unidad" readonly><select name="items[__INDEX__][priority]" required><option>Alta</option><option selected>Media</option><option>Baja</option></select><button class="remove-item" type="button" title="Quitar fila">×</button>
 </div></template>
 
 <dialog class="product-dialog" id="new-product-from-requirement"><form method="post" action="{{ route('products.store') }}">@csrf<div class="modal-head product-modal-head"><span class="modal-icon">▣</span><div><h2>Nuevo producto o servicio</h2><p>Al guardar se agregará al catálogo general.</p></div><button type="button" data-close>×</button></div>@include('products.form',['product'=>null])<div class="modal-foot"><small>Después de guardarlo podrás seleccionarlo en el requerimiento.</small><button type="button" data-close>Cancelar</button><button class="primary">Guardar producto</button></div></form></dialog>
@@ -122,6 +123,8 @@
         row.querySelector('.new-product-inline').addEventListener('click', () => document.getElementById('new-product-from-requirement').showModal());
     };
     bind(rows.querySelector('.requirement-item-row'));
+    document.getElementById('requirement-responsible').addEventListener('change', event => { if (event.target.value === '__new__') { event.target.value = ''; document.getElementById('responsibles').showModal(); } });
+    document.getElementById('requirement-area').addEventListener('change', event => { if (event.target.value === '__new__') { event.target.value = ''; document.getElementById('areas').showModal(); } });
     dialog.querySelector('.add-item').addEventListener('click', () => {
         const wrapper = document.createElement('div');
         wrapper.innerHTML = template.innerHTML.replaceAll('__INDEX__', nextIndex).replaceAll('__NUMBER__', rows.children.length + 1).trim();
