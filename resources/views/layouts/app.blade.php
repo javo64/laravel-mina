@@ -101,6 +101,13 @@
     });
     document.querySelectorAll('#sidebar nav a').forEach(link => link.addEventListener('click', () => document.body.classList.remove('nav-open')));
     document.querySelectorAll('[data-close]').forEach(button => button.addEventListener('click', () => button.closest('dialog').close()));
+    document.addEventListener('input', event => {
+        const field = event.target;
+        if (!field.matches('input[type="text"], textarea') || field.type === 'email' || field.dataset.preserveCase !== undefined) return;
+        const cursor = field.selectionStart;
+        const upper = field.value.toLocaleUpperCase('es-PE');
+        if (field.value !== upper) { field.value = upper; if (cursor !== null) field.setSelectionRange(cursor, cursor); }
+    });
 })();
 </script>
 @stack('scripts')

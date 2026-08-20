@@ -29,6 +29,7 @@ class ProductController extends Controller
     {
         $this->allowed();
         $data = $this->validated($request);
+        $this->uppercaseText($data);
         $prefix = $data['type'] === 'Servicio' ? 'SRV-' : 'PRD-';
         $data['code'] = ($data['code'] ?? null) ?: $prefix.str_pad((string)((Product::max('id') ?? 0) + 1), 5, '0', STR_PAD_LEFT);
         $this->setFlags($request, $data);
@@ -40,6 +41,7 @@ class ProductController extends Controller
     {
         $this->allowed();
         $data = $this->validated($request, $product);
+        $this->uppercaseText($data);
         $this->setFlags($request, $data);
         $product->update($data);
         return back()->with('success', 'Producto o servicio actualizado.');
@@ -60,12 +62,12 @@ class ProductController extends Controller
     {
         return $request->validate([
             'type' => ['required', Rule::in(['Producto','Servicio'])],
-            'name' => ['required','max:255'], 'secondary_name' => ['nullable','max:255'],
-            'description' => ['nullable','max:1000'],
+            'name' => ['required','max:255'], 'secondary_name' => ['required','max:255'],
+            'description' => ['required','max:1000'],
             'code' => ['nullable','max:50', Rule::unique('products','code')->ignore($product?->id)],
-            'barcode' => ['nullable','max:100'], 'category' => ['nullable','max:100'],
+            'barcode' => ['required','max:100'], 'category' => ['required','max:100'],
             'unit' => ['required','max:50'], 'currency' => ['required', Rule::in(['PEN','USD'])],
-            'price' => ['required','numeric','min:0'], 'stock' => ['nullable','integer','min:0'],
+            'price' => ['required','numeric','min:0.01'], 'stock' => ['required_if:type,Producto','nullable','integer','min:1'],
             'min_stock' => ['nullable','integer','min:0'], 'warehouse' => ['required','max:150'],
             'tax_affectation' => ['required','max:150'],
         ]);
@@ -76,5 +78,12 @@ class ProductController extends Controller
         $data['includes_tax'] = $request->boolean('includes_tax');
         $data['stock'] = $data['stock'] ?? 0;
         $data['min_stock'] = $data['min_stock'] ?? 0;
+    }
+
+    private function uppercaseText(array &$data): void
+    {
+        foreach (['name', 'secondary_name', 'description', 'barcode', 'category', 'warehouse', 'tax_affectation'] as $field) {
+            if (isset($data[$field]) && is_string($data[$field])) $data[$field] = mb_strtoupper($data[$field]);
+        }
     }
 }

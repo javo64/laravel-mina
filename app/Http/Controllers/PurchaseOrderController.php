@@ -30,8 +30,8 @@ class PurchaseOrderController extends Controller
             ->whereIn('type', ['Proveedor', 'Cliente y proveedor'])
             ->orderBy('name')->get();
         $bankAccounts = BankAccount::with(['partner','bank'])->where('is_active', true)->orderBy('bank_name')->get();
-        $approvedRequirements = Requirement::with(['items' => fn ($query) => $query->where('approval_status', 'Aprobado')->with('product')])
-            ->whereHas('items', fn ($query) => $query->where('approval_status', 'Aprobado'))
+        $approvedRequirements = Requirement::with(['items' => fn ($query) => $query->where('approval_status', 'Aprobado')->whereDoesntHave('purchaseOrderItems')->with('product')])
+            ->whereHas('items', fn ($query) => $query->where('approval_status', 'Aprobado')->whereDoesntHave('purchaseOrderItems'))
             ->latest('requested_at')->get();
         $branches = Branch::where('is_active', true)->orderBy('name')->get();
         $warehouses = Warehouse::where('is_active', true)->with('branch')->orderBy('name')->get();
@@ -57,7 +57,7 @@ class PurchaseOrderController extends Controller
             'items.*.requirement_item_id' => ['required', 'distinct', Rule::exists('requirement_items', 'id')->where('approval_status', 'Aprobado')],
             'items.*.cost_center' => ['required', 'max:255'],
             'items.*.quantity' => ['required', 'numeric', 'min:0.01'],
-            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+            'items.*.unit_price' => ['required', 'numeric', 'min:0.01'],
         ]);
 
         if (! empty($data['bank_account_id']) && ! BankAccount::where('id', $data['bank_account_id'])->where('business_partner_id', $data['supplier_id'])->exists()) {
@@ -69,7 +69,10 @@ class PurchaseOrderController extends Controller
 
         DB::transaction(function () use ($data): void {
             $lines = collect($data['items'])->map(function (array $line) {
-                $source = RequirementItem::with('product')->where('approval_status', 'Aprobado')->findOrFail($line['requirement_item_id']);
+                $source = RequirementItem::with('product')->where('approval_status', 'Aprobado')->lockForUpdate()->findOrFail($line['requirement_item_id']);
+                if ($source->purchaseOrderItems()->exists()) {
+                    abort(422, "El ítem {$source->product_name} ya fue utilizado en una orden y no puede volver a seleccionarse.");
+                }
                 if ((float) $line['quantity'] > (float) $source->quantity) {
                     abort(422, "La cantidad de {$source->product_name} no puede superar la aprobada.");
                 }

@@ -33,6 +33,12 @@ class PurchaseOrderWorkflowTest extends TestCase
 
         $this->assertDatabaseHas('purchase_orders', ['document'=>'OCO', 'series'=>'001', 'number'=>'000001', 'subtotal'=>200, 'tax'=>36, 'total'=>236]);
         $this->assertDatabaseHas('purchase_order_items', ['requirement_item_id'=>$item->id, 'cost_center'=>'CC-001', 'total'=>200]);
+        $this->actingAs($user)->get(route('purchase-orders.index'))->assertOk()->assertDontSee('REQ-OC-001');
+        $this->actingAs($user)->post(route('purchase-orders.store'), [
+            'destination_branch'=>'Sucursal principal', 'destination_warehouse'=>'Almacén principal', 'document'=>'OCO', 'series'=>'002',
+            'supplier_id'=>$supplier->id, 'bank_account_id'=>$account->id, 'payment_condition'=>'001 CONTADO', 'currency'=>'PEN', 'area'=>'LOGISTICA',
+            'items'=>[['requirement_item_id'=>$item->id, 'cost_center'=>'CC-001', 'quantity'=>2, 'unit_price'=>100]],
+        ])->assertStatus(422);
 
         $this->actingAs($user)->get(route('purchase-orders.next-correlative', ['document' => 'OCO', 'series' => '001']))
             ->assertOk()->assertJsonPath('number', '000002');
