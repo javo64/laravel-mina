@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class BankAccount extends Model
 {
-    protected $fillable = ['business_partner_id', 'account_type', 'account_number', 'bank_name', 'holder_name', 'currency', 'is_active'];
+    protected $fillable = ['business_partner_id', 'bank_id', 'account_type', 'account_number', 'bank_name', 'holder_name', 'currency', 'is_active'];
 
     protected function casts(): array
     {
@@ -16,5 +16,10 @@ class BankAccount extends Model
     public function partner()
     {
         return $this->belongsTo(BusinessPartner::class, 'business_partner_id');
+    }
+
+    public function bank()
+    {
+        return $this->belongsTo(Bank::class);
     }
 }

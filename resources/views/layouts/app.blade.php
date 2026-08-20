@@ -21,6 +21,7 @@
                 @if(auth()->user()->canAccess('products'))
                 <a data-label="Productos y Servicios" title="Productos y Servicios" class="{{ request()->routeIs('products.*')?'active':'' }}" href="{{ route('products.index') }}"><span class="nav-icon">◈</span><span class="nav-label">Productos y Servicios</span></a>
                 <a data-label="Recepción de Productos" title="Recepción de Productos" class="{{ request()->routeIs('product-receptions.*')?'active':'' }}" href="{{ route('product-receptions.index') }}"><span class="nav-icon">↓</span><span class="nav-label">Recepción de Productos</span></a>
+                <a data-label="Almacenes y Sucursales" title="Almacenes y Sucursales" class="{{ request()->routeIs('branches.*','warehouses.*')?'active':'' }}" href="{{ route('branches.index') }}"><span class="nav-icon">◇</span><span class="nav-label">Almacenes y Sucursales</span></a>
                 @endif
                 @if(auth()->user()->canAccess('requirements'))<a data-label="Requerimientos" title="Requerimientos" class="{{ request()->routeIs('requirements.*')?'active':'' }}" href="{{ route('requirements.index') }}"><span class="nav-icon">▤</span><span class="nav-label">Requerimientos</span></a>@endif
                 @if(auth()->user()->canAccess('approvals'))<a data-label="Aprobaciones" title="Aprobaciones" class="{{ request()->routeIs('approvals.*')?'active':'' }}" href="{{ route('approvals.index') }}"><span class="nav-icon">✓</span><span class="nav-label">Aprobaciones</span></a>@endif

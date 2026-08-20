@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\BusinessPartner;
 use App\Models\ProductReception;
+use App\Models\Bank;
+use App\Models\BankAccount;
 use App\Services\DocumentLookupService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -25,7 +27,10 @@ class BusinessPartnerController extends Controller
                 ->orWhere('trade_name', 'like', "%$value%")))
             ->latest()->paginate(12)->withQueryString();
 
-        return view('business-partners.index', compact('partners'));
+        $suppliers = BusinessPartner::where('is_active', true)->whereIn('type', ['Proveedor','Cliente y proveedor'])->orderBy('name')->get();
+        $banks = Bank::withCount(['accounts' => fn ($query) => $query->where('is_active', true)])->where('is_active', true)->orderBy('name')->get();
+        $bankAccounts = BankAccount::with(['partner','bank'])->where('is_active', true)->latest()->get();
+        return view('business-partners.index', compact('partners','suppliers','banks','bankAccounts'));
     }
 
     public function lookup(Request $request, DocumentLookupService $service)
@@ -69,6 +74,28 @@ class BusinessPartnerController extends Controller
         $businessPartner->delete();
 
         return back()->with('success', 'Cliente o proveedor eliminado correctamente.');
+    }
+
+    public function storeBank(Request $request)
+    {
+        $this->allowed();
+        $data = $request->validate(['name'=>['required','max:150','unique:banks,name'], 'code'=>['nullable','max:50','unique:banks,code']]);
+        Bank::create([...$data,'is_active'=>true]);
+        return back()->with('success','Banco registrado correctamente.');
+    }
+
+    public function storeBankAccount(Request $request)
+    {
+        $this->allowed();
+        $data = $request->validate([
+            'business_partner_id'=>['required', Rule::exists('business_partners','id')->where('is_active',true)],
+            'bank_id'=>['required', Rule::exists('banks','id')->where('is_active',true)],
+            'account_type'=>['required', Rule::in(['Cuenta Corriente','Cuenta Interbancaria'])],
+            'currency'=>['required', Rule::in(['PEN','USD'])], 'account_number'=>['required','max:100','unique:bank_accounts,account_number'], 'holder_name'=>['nullable','max:255'],
+        ]);
+        $data['bank_name'] = Bank::findOrFail($data['bank_id'])->name;
+        BankAccount::create([...$data,'is_active'=>true]);
+        return back()->with('success','Cuenta bancaria registrada para el proveedor.');
     }
 
     private function validated(Request $request, ?BusinessPartner $partner = null): array

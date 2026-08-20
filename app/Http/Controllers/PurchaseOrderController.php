@@ -8,6 +8,8 @@ use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\Requirement;
 use App\Models\RequirementItem;
+use App\Models\Branch;
+use App\Models\Warehouse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -27,12 +29,12 @@ class PurchaseOrderController extends Controller
         $suppliers = BusinessPartner::where('is_active', true)
             ->whereIn('type', ['Proveedor', 'Cliente y proveedor'])
             ->orderBy('name')->get();
-        $bankAccounts = BankAccount::with('partner')->where('is_active', true)->orderBy('bank_name')->get();
+        $bankAccounts = BankAccount::with(['partner','bank'])->where('is_active', true)->orderBy('bank_name')->get();
         $approvedRequirements = Requirement::with(['items' => fn ($query) => $query->where('approval_status', 'Aprobado')->with('product')])
             ->whereHas('items', fn ($query) => $query->where('approval_status', 'Aprobado'))
             ->latest('requested_at')->get();
-        $branches = array_values(array_unique(array_filter(array_merge(['Sucursal principal'], auth()->user()->newQuery()->pluck('branch')->all()))));
-        $warehouses = array_values(array_unique(array_filter(array_merge(['Almacén principal'], Product::where('is_active', true)->pluck('warehouse')->all()))));
+        $branches = Branch::where('is_active', true)->orderBy('name')->get();
+        $warehouses = Warehouse::where('is_active', true)->with('branch')->orderBy('name')->get();
 
         return view('purchase-orders.index', compact('orders', 'suppliers', 'bankAccounts', 'approvedRequirements', 'branches', 'warehouses'));
     }
@@ -41,8 +43,8 @@ class PurchaseOrderController extends Controller
     {
         $this->allowed();
         $data = $request->validate([
-            'destination_branch' => ['required', 'max:255'],
-            'destination_warehouse' => ['required', 'max:255'],
+            'destination_branch' => ['required', 'max:255', Rule::exists('branches','name')->where('is_active',true)],
+            'destination_warehouse' => ['required', 'max:255', Rule::exists('warehouses','name')->where('is_active',true)],
             'document' => ['required', Rule::in(['OCO', 'OS'])],
             'series' => ['required', Rule::in($this->availableSeries($request->document))],
             'supplier_id' => ['required', Rule::exists('business_partners', 'id')->where('is_active', true)],
@@ -57,6 +59,13 @@ class PurchaseOrderController extends Controller
             'items.*.quantity' => ['required', 'numeric', 'min:0.01'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
         ]);
+
+        if (! empty($data['bank_account_id']) && ! BankAccount::where('id', $data['bank_account_id'])->where('business_partner_id', $data['supplier_id'])->exists()) {
+            return back()->withErrors(['bank_account_id' => 'La cuenta bancaria seleccionada no pertenece al proveedor elegido.'])->withInput();
+        }
+        if (! Warehouse::where('name', $data['destination_warehouse'])->whereHas('branch', fn ($query) => $query->where('name', $data['destination_branch']))->exists()) {
+            return back()->withErrors(['destination_warehouse' => 'El almacén debe pertenecer a la sucursal destino seleccionada.'])->withInput();
+        }
 
         DB::transaction(function () use ($data): void {
             $lines = collect($data['items'])->map(function (array $line) {
