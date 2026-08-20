@@ -11,7 +11,7 @@ use Illuminate\Validation\Rule;
 
 class ApprovalController extends Controller
 {
-    private const STATUSES = ['Pendiente', 'Aprobado', 'Rechazado', 'Anulado'];
+    private const STATUSES = ['Pendiente', 'Aprobado', 'Anulado'];
 
     private function allowed(): void
     {
@@ -21,15 +21,15 @@ class ApprovalController extends Controller
     public function index(Request $request)
     {
         $this->allowed();
-        $activeStatus = in_array($request->string('estado')->toString(), self::STATUSES, true)
+        $activeStatus = in_array($request->string('estado')->toString(), array_merge(['Todos'], self::STATUSES), true)
             ? $request->string('estado')->toString()
-            : 'Pendiente';
+            : 'Todos';
         $counts = RequirementItem::query()
             ->selectRaw('approval_status, count(*) as total')
             ->groupBy('approval_status')
             ->pluck('total', 'approval_status');
         $items = RequirementItem::with(['requirement.decisionMaker', 'requirement.items.decisionMaker', 'decisionMaker'])
-            ->where('approval_status', $activeStatus)
+            ->when($activeStatus !== 'Todos', fn ($query) => $query->where('approval_status', $activeStatus))
             ->latest('updated_at')
             ->latest('id')
             ->paginate(12)

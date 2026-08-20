@@ -27,10 +27,10 @@ class ApprovalItemWorkflowTest extends TestCase
         $this->assertSame('Parcial', $requirement->fresh()->status);
     }
 
-    public function test_tabs_separate_pending_approved_rejected_and_annulled_items(): void
+    public function test_cards_separate_all_pending_approved_and_annulled_items(): void
     {
         $approver = User::factory()->create(['permissions'=>['approvals']]);
-        foreach (['Pendiente','Aprobado','Rechazado','Anulado'] as $index=>$status) {
+        foreach (['Pendiente','Aprobado','Anulado'] as $index=>$status) {
             $requirement = Requirement::create([
                 'code'=>'REQ-TAB-00'.($index+1),'requested_at'=>'2026-08-19','responsible'=>'Javier',
                 'project'=>'Fabulosa','area'=>'Operaciones','priority'=>'Alta','status'=>$status,
@@ -41,10 +41,13 @@ class ApprovalItemWorkflowTest extends TestCase
             ]);
         }
 
-        foreach (['Pendiente','Aprobado','Rechazado','Anulado'] as $status) {
+        $all = $this->actingAs($approver)->get(route('approvals.index', ['estado'=>'Todos']));
+        $all->assertOk()->assertSee('Producto Pendiente')->assertSee('Producto Aprobado')->assertSee('Producto Anulado');
+
+        foreach (['Pendiente','Aprobado','Anulado'] as $status) {
             $response = $this->actingAs($approver)->get(route('approvals.index', ['estado'=>$status]));
             $response->assertOk()->assertSee('Producto '.$status);
-            foreach (array_diff(['Pendiente','Aprobado','Rechazado','Anulado'], [$status]) as $other) {
+            foreach (array_diff(['Pendiente','Aprobado','Anulado'], [$status]) as $other) {
                 $response->assertDontSee('Producto '.$other);
             }
         }
@@ -59,10 +62,10 @@ class ApprovalItemWorkflowTest extends TestCase
             ['product_name'=>'Aceite','quantity'=>5,'unit'=>'Galón','priority'=>'Media'],
         ]);
 
-        $this->actingAs($approver)->post(route('approvals.decide', $requirement), ['status'=>'Rechazado'])->assertRedirect();
+        $this->actingAs($approver)->post(route('approvals.decide', $requirement), ['status'=>'Anulado'])->assertRedirect();
 
-        $this->assertSame('Rechazado', $requirement->fresh()->status);
-        $this->assertSame(2, RequirementItem::where('requirement_id', $requirement->id)->where('approval_status', 'Rechazado')->count());
+        $this->assertSame('Anulado', $requirement->fresh()->status);
+        $this->assertSame(2, RequirementItem::where('requirement_id', $requirement->id)->where('approval_status', 'Anulado')->count());
     }
 
     public function test_administrator_sees_configuration_even_with_incomplete_permissions(): void
