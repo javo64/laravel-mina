@@ -33,7 +33,7 @@ class User extends Authenticatable
 
     public function canAccess(string $module): bool
     {
-        return in_array($module, $this->permissions ?? [], true);
+        return $this->isAdministrator() || in_array($module, $this->permissions ?? [], true);
     }
 
     public function isAdministrator(): bool
