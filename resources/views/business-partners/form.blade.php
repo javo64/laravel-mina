@@ -13,4 +13,11 @@
     <label class="partner-span-4">Teléfono<input name="phone" value="{{ old('phone',optional($partner)->phone) }}"></label>
     <label class="partner-span-6">Correo electrónico<input type="email" name="email" value="{{ old('email',optional($partner)->email) }}"></label>
     <label class="partner-active"><input type="checkbox" name="is_active" value="1" {{ optional($partner)->is_active!==false?'checked':'' }}> Registro activo</label>
+    @if(! $partner)
+    <div class="form-section-title"><strong>Cuentas bancarias</strong><span>Opcional: se registrarán junto con el cliente o proveedor.</span></div>
+    <div class="partner-span-12" id="partner-bank-accounts" data-next="1">
+        <div class="form-grid partner-bank-row"><label>Banco<select name="bank_accounts[0][bank_id]"><option value="">Seleccionar banco</option>@foreach($banks as $bank)<option value="{{ $bank->id }}">{{ $bank->name }}</option>@endforeach</select></label><label>Tipo<select name="bank_accounts[0][account_type]"><option value="Cuenta Corriente">Cuenta Corriente</option><option value="Cuenta Interbancaria">Cuenta Interbancaria</option></select></label><label>Moneda<select name="bank_accounts[0][currency]"><option value="PEN">Soles (PEN)</option><option value="USD">Dólares (USD)</option></select></label><label>N.º de cuenta<input name="bank_accounts[0][account_number]" maxlength="100"></label><label>Titular<input name="bank_accounts[0][holder_name]" maxlength="255"></label></div>
+    </div>
+    <button type="button" class="secondary partner-span-12" id="add-partner-bank-account">＋ Agregar otra cuenta</button>
+    @endif
 </div>

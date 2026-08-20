@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\MeasurementUnit;
+use App\Models\Product;
 use Illuminate\Http\Request;
 
 class MeasurementUnitController extends Controller
@@ -20,8 +21,9 @@ class MeasurementUnitController extends Controller
 
     public function destroy(MeasurementUnit $unit)
     {
-        $this->allowed();
-        $unit->update(['is_active' => false]);
-        return back()->with('success', 'Unidad de medida retirada de la lista.');
+        abort_unless(auth()->user()->isAdministrator(), 403);
+        if (Product::where('unit', $unit->symbol)->orWhere('unit', $unit->name)->exists()) return back()->withErrors('No se puede eliminar la unidad porque tiene productos vinculados.');
+        $unit->delete();
+        return back()->with('success', 'Unidad de medida eliminada correctamente.');
     }
 }

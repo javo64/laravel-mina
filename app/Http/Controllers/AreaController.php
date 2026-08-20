@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Area;
+use App\Models\Requirement;
 use Illuminate\Http\Request;
 
 class AreaController extends Controller
@@ -20,8 +21,9 @@ class AreaController extends Controller
 
     public function destroy(Area $area)
     {
-        $this->allowed();
-        $area->update(['is_active' => false]);
-        return back()->with('success', 'Área retirada de la lista.');
+        abort_unless(auth()->user()->isAdministrator(), 403);
+        if (Requirement::where('area', $area->name)->exists()) return back()->withErrors('No se puede eliminar el área porque tiene requerimientos vinculados.');
+        $area->delete();
+        return back()->with('success', 'Área eliminada correctamente.');
     }
 }

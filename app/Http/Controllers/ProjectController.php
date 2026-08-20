@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Project;
+use App\Models\Requirement;
 use Illuminate\Http\Request;
 
 class ProjectController extends Controller
@@ -21,8 +22,9 @@ class ProjectController extends Controller
 
     public function destroy(Project $project)
     {
-        $this->allowed();
-        $project->update(['is_active' => false]);
-        return back()->with('success', 'Proyecto retirado de la lista.');
+        abort_unless(auth()->user()->isAdministrator(), 403);
+        if (Requirement::where('project', $project->name)->exists()) return back()->withErrors('No se puede eliminar el proyecto porque tiene requerimientos vinculados.');
+        $project->delete();
+        return back()->with('success', 'Proyecto eliminado correctamente.');
     }
 }

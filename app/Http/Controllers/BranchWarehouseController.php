@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Branch;
 use App\Models\Warehouse;
+use App\Models\Product;
+use App\Models\PurchaseOrder;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -37,6 +39,21 @@ class BranchWarehouseController extends Controller
         return back()->with('success', 'Almacén registrado correctamente.');
     }
 
-    public function destroyBranch(Branch $branch) { $this->allowed(); $branch->update(['is_active'=>false]); $branch->warehouses()->update(['is_active'=>false]); return back()->with('success','Sucursal y almacenes retirados.'); }
-    public function destroyWarehouse(Warehouse $warehouse) { $this->allowed(); $warehouse->update(['is_active'=>false]); return back()->with('success','Almacén retirado.'); }
+    public function destroyBranch(Branch $branch)
+    {
+        abort_unless(auth()->user()->isAdministrator(), 403);
+        $warehouseNames = $branch->warehouses()->pluck('name');
+        if ($branch->warehouses()->exists()) return back()->withErrors('No se puede eliminar la sucursal mientras tenga almacenes. Elimine primero los almacenes sin transacciones.');
+        if (PurchaseOrder::where('destination_branch', $branch->name)->exists() || Product::whereIn('warehouse', $warehouseNames)->exists()) return back()->withErrors('No se puede eliminar la sucursal porque tiene transacciones vinculadas.');
+        $branch->delete();
+        return back()->with('success','Sucursal eliminada correctamente.');
+    }
+
+    public function destroyWarehouse(Warehouse $warehouse)
+    {
+        abort_unless(auth()->user()->isAdministrator(), 403);
+        if (PurchaseOrder::where('destination_warehouse', $warehouse->name)->exists() || Product::where('warehouse', $warehouse->name)->exists()) return back()->withErrors('No se puede eliminar el almacén porque tiene productos u órdenes vinculadas.');
+        $warehouse->delete();
+        return back()->with('success','Almacén eliminado correctamente.');
+    }
 }

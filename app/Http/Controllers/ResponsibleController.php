@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Responsible;
+use App\Models\Requirement;
 use Illuminate\Http\Request;
 
 class ResponsibleController extends Controller
@@ -28,9 +29,10 @@ class ResponsibleController extends Controller
 
     public function destroy(Responsible $responsible)
     {
-        $this->allowed();
-        $responsible->update(['is_active' => false]);
+        abort_unless(auth()->user()->isAdministrator(), 403);
+        if (Requirement::where('responsible', $responsible->name)->exists()) return back()->withErrors('No se puede eliminar el responsable porque tiene requerimientos vinculados.');
+        $responsible->delete();
 
-        return back()->with('success', 'Responsable retirado de la lista.');
+        return back()->with('success', 'Responsable eliminado correctamente.');
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\CostCenter;
+use App\Models\RequirementItem;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -56,12 +57,10 @@ class CostCenterController extends Controller
 
     public function destroy(CostCenter $costCenter)
     {
-        $this->allowed();
-        $costCenter->update(['is_active' => false]);
-        if (! $costCenter->parent_id) {
-            $costCenter->children()->update(['is_active' => false]);
-        }
-
-        return back()->with('success', 'Centro de costos retirado de la lista.');
+        abort_unless(auth()->user()->isAdministrator(), 403);
+        if ($costCenter->children()->exists()) return back()->withErrors('No se puede eliminar el grupo porque tiene centros de costos hijos.');
+        if (RequirementItem::where('cost_center_id', $costCenter->id)->exists()) return back()->withErrors('No se puede eliminar el centro de costos porque está vinculado a un requerimiento.');
+        $costCenter->delete();
+        return back()->with('success', 'Centro de costos eliminado correctamente.');
     }
 }

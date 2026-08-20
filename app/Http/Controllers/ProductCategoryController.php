@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ProductCategory;
+use App\Models\Product;
 use Illuminate\Http\Request;
 
 class ProductCategoryController extends Controller
@@ -20,8 +21,9 @@ class ProductCategoryController extends Controller
 
     public function destroy(ProductCategory $category)
     {
-        $this->allowed();
-        $category->update(['is_active' => false]);
-        return back()->with('success', 'Categoría retirada de la lista.');
+        abort_unless(auth()->user()->isAdministrator(), 403);
+        if (Product::where('category', $category->name)->exists()) return back()->withErrors('No se puede eliminar la categoría porque tiene productos vinculados.');
+        $category->delete();
+        return back()->with('success', 'Categoría eliminada correctamente.');
     }
 }

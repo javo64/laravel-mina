@@ -4,11 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\BusinessPartner;
 use App\Models\ProductReception;
+use App\Models\PurchaseOrder;
 use App\Models\Bank;
 use App\Models\BankAccount;
 use App\Services\DocumentLookupService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
 
 class BusinessPartnerController extends Controller
 {
@@ -47,9 +49,24 @@ class BusinessPartnerController extends Controller
     {
         $this->allowed();
         $data = $this->validated($request);
+        $accounts = $data['bank_accounts'] ?? [];
+        unset($data['bank_accounts']);
         $data['created_by'] = auth()->id();
         $data['is_active'] = $request->boolean('is_active', true);
-        BusinessPartner::create($data);
+        DB::transaction(function () use ($data, $accounts) {
+            $partner = BusinessPartner::create($data);
+            foreach ($accounts as $account) {
+                if (blank($account['bank_id'] ?? null) || blank($account['account_number'] ?? null)) continue;
+                $bank = Bank::findOrFail($account['bank_id']);
+                BankAccount::create([
+                    ...$account,
+                    'business_partner_id' => $partner->id,
+                    'bank_name' => $bank->name,
+                    'holder_name' => $account['holder_name'] ?: $partner->name,
+                    'is_active' => true,
+                ]);
+            }
+        });
 
         return redirect()->route('business-partners.index')
             ->with('success', 'Cliente o proveedor registrado correctamente.');
@@ -68,9 +85,10 @@ class BusinessPartnerController extends Controller
     public function destroy(BusinessPartner $businessPartner)
     {
         abort_unless(auth()->user()->isAdministrator(), 403);
-        if (ProductReception::where('supplier', $businessPartner->name)->exists()) {
-            return back()->withErrors('No se puede eliminar el cliente o proveedor porque está vinculado a una recepción de productos.');
+        if (ProductReception::where('supplier', $businessPartner->name)->exists() || PurchaseOrder::where('supplier_id', $businessPartner->id)->exists()) {
+            return back()->withErrors('No se puede eliminar el cliente o proveedor porque tiene transacciones vinculadas.');
         }
+        if (BankAccount::where('business_partner_id', $businessPartner->id)->exists()) return back()->withErrors('No se puede eliminar el cliente o proveedor porque tiene cuentas bancarias registradas. Elimine primero las cuentas sin uso.');
         $businessPartner->delete();
 
         return back()->with('success', 'Cliente o proveedor eliminado correctamente.');
@@ -102,6 +120,22 @@ class BusinessPartnerController extends Controller
         return back()->with('success','Cuenta bancaria registrada para el proveedor.');
     }
 
+    public function destroyBank(Bank $bank)
+    {
+        abort_unless(auth()->user()->isAdministrator(), 403);
+        if ($bank->accounts()->exists()) return back()->withErrors('No se puede eliminar el banco porque tiene cuentas registradas.');
+        $bank->delete();
+        return back()->with('success', 'Banco eliminado correctamente.');
+    }
+
+    public function destroyBankAccount(BankAccount $bankAccount)
+    {
+        abort_unless(auth()->user()->isAdministrator(), 403);
+        if (PurchaseOrder::where('bank_account_id', $bankAccount->id)->exists()) return back()->withErrors('No se puede eliminar la cuenta porque está vinculada a una orden de compra o servicio.');
+        $bankAccount->delete();
+        return back()->with('success', 'Cuenta bancaria eliminada correctamente.');
+    }
+
     private function validated(Request $request, ?BusinessPartner $partner = null): array
     {
         return $request->validate([
@@ -119,6 +153,12 @@ class BusinessPartnerController extends Controller
             'department' => ['nullable', 'string', 'max:150'],
             'phone' => ['nullable', 'string', 'max:30'],
             'email' => ['nullable', 'email', 'max:255'],
+            'bank_accounts' => ['nullable', 'array'],
+            'bank_accounts.*.bank_id' => ['nullable', Rule::exists('banks', 'id')->where('is_active', true)],
+            'bank_accounts.*.account_type' => ['nullable', Rule::in(['Cuenta Corriente','Cuenta Interbancaria'])],
+            'bank_accounts.*.currency' => ['nullable', Rule::in(['PEN','USD'])],
+            'bank_accounts.*.account_number' => ['nullable','max:100','distinct', Rule::unique('bank_accounts','account_number')],
+            'bank_accounts.*.holder_name' => ['nullable','max:255'],
         ]);
     }
 }
