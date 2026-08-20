@@ -22,7 +22,7 @@
 
 <div class="card approval-items-board">
     <header><div><h2>{{ $tabs[$activeStatus]['label'] }}</h2><p>{{ $tabs[$activeStatus]['help'] }} · doble clic para revisar el requerimiento completo</p></div><span class="badge {{ strtolower($activeStatus) }}">{{ $items->total() }} ítem(s)</span></header>
-    <div class="table-wrap"><table><thead><tr><th>Requerimiento</th><th>Producto / servicio</th><th>Cantidad</th><th>Solicitante</th><th>Proyecto / área</th><th>Estado</th><th>Decisión</th><th>Acciones</th></tr></thead><tbody>
+    <div class="table-wrap"><table><thead><tr><th>Requerimiento</th><th>Producto / servicio</th><th>Cantidad</th><th>Solicitante</th><th>Proyecto / área</th><th>Estado</th><th>Decidido por</th></tr></thead><tbody>
     @forelse($items as $detail)
         @php($requirement=$detail->requirement)
         <tr class="approval-review-row" tabindex="0" data-requirement-id="{{ $requirement->id }}" title="Doble clic para revisar {{ $requirement->code }}">
@@ -33,14 +33,9 @@
             <td><strong>{{ $requirement->project }}</strong><small>{{ $requirement->area ?: 'Sin área' }}</small></td>
             <td><span class="badge {{ strtolower($detail->approval_status) }}">{{ $detail->approval_status }}</span></td>
             <td>@if($detail->decision_at)<strong>{{ $detail->decisionMaker?->name ?: 'Usuario retirado' }}</strong><small>{{ $detail->decision_at->format('d/m/Y H:i') }}</small>@else<small>Sin decisión</small>@endif</td>
-            <td><div class="item-decision-actions">
-                @foreach(['Aprobado'=>'✓','Pendiente'=>'◷','Rechazado'=>'×','Anulado'=>'⊘'] as $status=>$icon)
-                @if($status!==$detail->approval_status)<form method="post" action="{{ route('approvals.items.decide',$detail) }}">@csrf<input type="hidden" name="status" value="{{ $status }}"><button class="status-action {{ strtolower($status) }}" title="Marcar como {{ $status }}">{{ $icon }} <span>{{ $status }}</span></button></form>@endif
-                @endforeach
-            </div></td>
         </tr>
     @empty
-        <tr><td colspan="8"><div class="empty-state"><b>{{ $tabs[$activeStatus]['icon'] }}</b><p>No hay ítems en el bloque {{ strtolower($tabs[$activeStatus]['label']) }}.</p></div></td></tr>
+        <tr><td colspan="7"><div class="empty-state"><b>{{ $tabs[$activeStatus]['icon'] }}</b><p>No hay ítems en el bloque {{ strtolower($tabs[$activeStatus]['label']) }}.</p></div></td></tr>
     @endforelse
     </tbody></table></div>
     {{ $items->links() }}
@@ -52,12 +47,12 @@
     <div class="approval-review-body">
         <section class="approval-detail-pane">
             <article class="approval-detail-card"><h3>Información general</h3><dl><div><dt>Fecha</dt><dd>{{ $requirement->requested_at->format('d/m/Y') }}</dd></div><div><dt>Responsable</dt><dd>{{ $requirement->responsible }}</dd></div><div><dt>Proyecto</dt><dd>{{ $requirement->project }}</dd></div><div><dt>Área solicitante</dt><dd>{{ $requirement->area ?: 'No indicada' }}</dd></div><div><dt>Prioridad</dt><dd>{{ $requirement->priority }}</dd></div><div><dt>Estado general</dt><dd><span class="badge {{ strtolower($requirement->status) }}">{{ $requirement->status }}</span></dd></div></dl></article>
-            <article class="approval-detail-card approval-items-card"><h3>Decisión por ítems <b>{{ $requirement->items->count() }}</b></h3><div class="approval-items-table"><table><thead><tr><th>#</th><th>Producto</th><th>Cantidad</th><th>Estado</th><th>Decidido por</th></tr></thead><tbody>@foreach($requirement->items as $index=>$line)<tr><td>{{ $index+1 }}</td><td><strong>{{ $line->product_name }}</strong>@if($line->description)<small>{{ $line->description }}</small>@endif</td><td>{{ rtrim(rtrim(number_format((float)$line->quantity,2,'.',''), '0'), '.') }} {{ $line->unit }}</td><td><span class="badge {{ strtolower($line->approval_status) }}">{{ $line->approval_status }}</span></td><td>{{ $line->decisionMaker?->name ?: '—' }}@if($line->decision_at)<small>{{ $line->decision_at->format('d/m/Y H:i') }}</small>@endif</td></tr>@endforeach</tbody></table></div></article>
+            <article class="approval-detail-card approval-items-card"><h3>Decisión por ítems <b>{{ $requirement->items->count() }}</b></h3><div class="approval-items-table"><table><thead><tr><th>#</th><th>Producto</th><th>Cantidad</th><th>Estado</th><th>Decidido por / aprobación</th></tr></thead><tbody>@foreach($requirement->items as $index=>$line)<tr><td>{{ $index+1 }}</td><td><strong>{{ $line->product_name }}</strong>@if($line->description)<small>{{ $line->description }}</small>@endif</td><td>{{ rtrim(rtrim(number_format((float)$line->quantity,2,'.',''), '0'), '.') }} {{ $line->unit }}</td><td><span class="badge {{ strtolower($line->approval_status) }}">{{ $line->approval_status }}</span></td><td class="item-review-decision"><div>{{ $line->decisionMaker?->name ?: '—' }}@if($line->decision_at)<small>{{ $line->decision_at->format('d/m/Y H:i') }}</small>@endif</div><div class="item-decision-actions">@foreach(['Aprobado'=>'✓','Pendiente'=>'◷','Rechazado'=>'×','Anulado'=>'⊘'] as $status=>$icon)@if($status!==$line->approval_status)<form method="post" action="{{ route('approvals.items.decide',$line) }}">@csrf<input type="hidden" name="status" value="{{ $status }}"><button class="status-action {{ strtolower($status) }}" title="Marcar como {{ $status }}">{{ $icon }} <span>{{ $status }}</span></button></form>@endif @endforeach</div></td></tr>@endforeach</tbody></table></div></article>
             <article class="approval-detail-card approval-trace"><h3>Trazabilidad</h3><p>El estado general se calcula automáticamente a partir de las decisiones individuales. Los ítems aprobados quedan disponibles para integrar una orden de compra.</p></article>
         </section>
         <section class="approval-pdf-pane"><div class="approval-pdf-toolbar"><div><strong>Documento PDF</strong><small>Vista generada desde el requerimiento</small></div><a href="{{ route('approvals.pdf',[$requirement,'download'=>1]) }}">⇩ Descargar PDF</a></div><iframe title="PDF del requerimiento {{ $requirement->code }}" data-src="{{ route('approvals.pdf',$requirement) }}#toolbar=1&navpanes=0&view=FitH"></iframe></section>
     </div>
-    <footer><button type="button" data-close>Cerrar</button><small>Las decisiones se realizan desde la tabla de cada pestaña.</small></footer>
+    <footer><button type="button" data-close>Cerrar</button><div class="approval-modal-actions"><form method="post" action="{{ route('approvals.decide',$requirement) }}">@csrf<input type="hidden" name="status" value="Aprobado"><button class="approve" type="submit">✓ Aprobar total</button></form></div></footer>
 </dialog>
 @endforeach
 @endsection
