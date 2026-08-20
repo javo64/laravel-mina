@@ -16,7 +16,7 @@
     <label class="span-3">Precio de venta *<span class="price-input"><b>S/</b><input type="number" step="0.01" min="0" name="price" required value="{{ old('price',optional($product)->price ?? 0) }}"></span></label>
     <label class="span-3">Stock inicial<input type="number" min="0" name="stock" value="{{ old('stock',optional($product)->stock ?? 0) }}"></label>
     <label class="span-3">Stock mínimo<input type="number" min="0" name="min_stock" value="{{ old('min_stock',optional($product)->min_stock ?? 1) }}"></label>
-    <label class="span-3">Código interno<input name="code" value="{{ old('code',optional($product)->code) }}" placeholder="Se genera automáticamente"></label>
+    <label class="span-3">Código interno<input value="{{ optional($product)->code ?: 'Se generará automáticamente' }}" readonly></label>
     <label class="span-3">Código de barras<input name="barcode" value="{{ old('barcode',optional($product)->barcode) }}" placeholder="Escanea o escribe el código"></label>
     <label class="span-3">Almacén<select name="warehouse" required><option {{ old('warehouse',optional($product)->warehouse ?? 'Almacén principal')==='Almacén principal'?'selected':'' }}>Almacén principal</option></select></label>
     <label class="span-3">Tipo de afectación<select name="tax_affectation" required><option {{ old('tax_affectation',optional($product)->tax_affectation ?? 'Gravado - Operación onerosa')==='Gravado - Operación onerosa'?'selected':'' }}>Gravado - Operación onerosa</option><option>Exonerado</option><option>Inafecto</option></select></label>

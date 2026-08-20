@@ -50,7 +50,7 @@
 
 <dialog id="projects"><div class="modal-head"><div><h2>Registro de proyectos</h2><p>Administra los proyectos asociados a los requerimientos.</p></div><button type="button" data-close>×</button></div>
     <form method="post" action="{{ route('projects.store') }}">@csrf
-        <div class="form-grid"><label>Nombre del proyecto *<input name="name" required></label><label>Código<input name="code"></label><label>Descripción<input name="description"></label></div>
+        <div class="form-grid"><label>Nombre del proyecto *<input name="name" required></label><label>Descripción<input name="description"></label></div>
         <div class="modal-foot"><button type="button" data-close>Cancelar</button><button class="primary">＋ Registrar proyecto</button></div>
     </form>
     <div class="manage-list">

@@ -12,7 +12,8 @@ class ProjectController extends Controller
     public function store(Request $request)
     {
         $this->allowed();
-        $data = $request->validate(['name' => ['required','max:255','unique:projects,name'], 'code' => ['nullable','max:50','unique:projects,code'], 'description' => ['nullable','max:500']]);
+        $data = $request->validate(['name' => ['required','max:255','unique:projects,name'], 'description' => ['nullable','max:500']]);
+        $data['code'] = 'PRY-'.str_pad((string) ((Project::max('id') ?? 0) + 1), 4, '0', STR_PAD_LEFT);
         $data['is_active'] = true;
         Project::create($data);
         return back()->with('success', 'Proyecto registrado correctamente.');

@@ -26,11 +26,10 @@ class CostCenterTest extends TestCase
         $this->actingAs($user)->post(route('cost-centers.store'), [
             'parent_id' => $parent->id,
             'name' => 'MANTENIMIENTO DE PLANTA',
-            'code' => 'GO-001',
             'description' => 'Costos de mantenimiento operativo.',
         ])->assertRedirect(route('cost-centers.index'));
 
-        $this->assertDatabaseHas('cost_centers', ['parent_id' => $parent->id, 'name' => 'MANTENIMIENTO DE PLANTA', 'code' => 'GO-001']);
+        $this->assertDatabaseHas('cost_centers', ['parent_id' => $parent->id, 'name' => 'MANTENIMIENTO DE PLANTA']);
     }
 
     public function test_user_without_costs_permission_cannot_manage_cost_centers(): void

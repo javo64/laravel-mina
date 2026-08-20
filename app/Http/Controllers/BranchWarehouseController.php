@@ -21,7 +21,8 @@ class BranchWarehouseController extends Controller
     public function storeBranch(Request $request)
     {
         $this->allowed();
-        $data = $request->validate(['name'=>['required','max:150','unique:branches,name'], 'code'=>['nullable','max:50','unique:branches,code'], 'address'=>['nullable','max:255']]);
+        $data = $request->validate(['name'=>['required','max:150','unique:branches,name'], 'address'=>['nullable','max:255']]);
+        $data['code'] = 'SUC-'.str_pad((string) ((Branch::max('id') ?? 0) + 1), 4, '0', STR_PAD_LEFT);
         Branch::create([...$data, 'is_active'=>true, 'created_by'=>auth()->id()]);
         return back()->with('success', 'Sucursal registrada correctamente.');
     }
@@ -29,7 +30,8 @@ class BranchWarehouseController extends Controller
     public function storeWarehouse(Request $request)
     {
         $this->allowed();
-        $data = $request->validate(['branch_id'=>['required', Rule::exists('branches','id')->where('is_active', true)], 'name'=>['required','max:150'], 'code'=>['nullable','max:50','unique:warehouses,code'], 'address'=>['nullable','max:255']]);
+        $data = $request->validate(['branch_id'=>['required', Rule::exists('branches','id')->where('is_active', true)], 'name'=>['required','max:150'], 'address'=>['nullable','max:255']]);
+        $data['code'] = 'ALM-'.str_pad((string) ((Warehouse::max('id') ?? 0) + 1), 4, '0', STR_PAD_LEFT);
         if (Warehouse::where('branch_id',$data['branch_id'])->whereRaw('LOWER(name)=?', [mb_strtolower($data['name'])])->exists()) return back()->withErrors(['name'=>'Ya existe este almacén en la sucursal seleccionada.'])->withInput();
         Warehouse::create([...$data, 'is_active'=>true, 'created_by'=>auth()->id()]);
         return back()->with('success', 'Almacén registrado correctamente.');

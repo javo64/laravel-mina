@@ -29,7 +29,6 @@ class CostCenterController extends Controller
         $data = $request->validate([
             'parent_id' => ['nullable', Rule::exists('cost_centers', 'id')->where('is_active', true)],
             'name' => ['required', 'string', 'max:150'],
-            'code' => ['nullable', 'string', 'max:50', 'unique:cost_centers,code'],
             'description' => ['nullable', 'string', 'max:500'],
         ]);
 
@@ -37,6 +36,7 @@ class CostCenterController extends Controller
             return back()->withErrors(['name' => 'Ya existe un centro de costo con este nombre en el mismo grupo.'])->withInput();
         }
 
+        $data['code'] = 'CC-'.str_pad((string) ((CostCenter::max('id') ?? 0) + 1), 4, '0', STR_PAD_LEFT);
         CostCenter::create([...$data, 'is_active' => true, 'created_by' => auth()->id()]);
 
         return back()->with('success', empty($data['parent_id']) ? 'Grupo de centro de costos creado.' : 'Centro de costo agregado correctamente.');
@@ -47,7 +47,6 @@ class CostCenterController extends Controller
         $this->allowed();
         $data = $request->validate([
             'name' => ['required', 'string', 'max:150'],
-            'code' => ['nullable', 'string', 'max:50', Rule::unique('cost_centers', 'code')->ignore($costCenter)],
             'description' => ['nullable', 'string', 'max:500'],
         ]);
         $costCenter->update($data);

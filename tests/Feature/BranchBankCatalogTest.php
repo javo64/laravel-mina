@@ -29,11 +29,12 @@ class BranchBankCatalogTest extends TestCase
     {
         $user = User::factory()->create(['permissions' => ['logistics']]);
         $supplier = BusinessPartner::create(['type'=>'Proveedor','document_type'=>'RUC','document_number'=>'20999999991','name'=>'Proveedor Banco SAC','is_active'=>true]);
-        $this->actingAs($user)->post(route('banks.store'), ['name'=>'Banco de Prueba','code'=>'BPR'])->assertRedirect();
+        $this->actingAs($user)->postJson(route('banks.store'), ['name'=>'Banco de Prueba'])
+            ->assertCreated()->assertJsonPath('name', 'Banco de Prueba')->assertJsonPath('code', 'BAN-0001');
         $bank = Bank::where('name','Banco de Prueba')->firstOrFail();
-        $this->actingAs($user)->post(route('business-partners.bank-accounts.store'), [
+        $this->actingAs($user)->postJson(route('business-partners.bank-accounts.store'), [
             'business_partner_id'=>$supplier->id,'bank_id'=>$bank->id,'account_type'=>'Cuenta Interbancaria','currency'=>'USD','account_number'=>'002999999999','holder_name'=>'Proveedor Banco SAC',
-        ])->assertRedirect();
+        ])->assertCreated()->assertJsonPath('bank', 'Banco de Prueba')->assertJsonPath('currency', 'USD');
         $this->assertDatabaseHas('bank_accounts',['business_partner_id'=>$supplier->id,'bank_id'=>$bank->id,'account_type'=>'Cuenta Interbancaria','currency'=>'USD']);
     }
 }

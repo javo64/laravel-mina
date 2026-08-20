@@ -30,7 +30,7 @@ class ProductController extends Controller
         $this->allowed();
         $data = $this->validated($request);
         $prefix = $data['type'] === 'Servicio' ? 'SRV-' : 'PRD-';
-        $data['code'] = $data['code'] ?: $prefix.str_pad((string)((Product::max('id') ?? 0) + 1), 5, '0', STR_PAD_LEFT);
+        $data['code'] = ($data['code'] ?? null) ?: $prefix.str_pad((string)((Product::max('id') ?? 0) + 1), 5, '0', STR_PAD_LEFT);
         $this->setFlags($request, $data);
         Product::create($data);
         return back()->with('success', 'Producto o servicio guardado correctamente.');

@@ -79,8 +79,10 @@ class BusinessPartnerController extends Controller
     public function storeBank(Request $request)
     {
         $this->allowed();
-        $data = $request->validate(['name'=>['required','max:150','unique:banks,name'], 'code'=>['nullable','max:50','unique:banks,code']]);
-        Bank::create([...$data,'is_active'=>true]);
+        $data = $request->validate(['name'=>['required','max:150','unique:banks,name']]);
+        $data['code'] = 'BAN-'.str_pad((string) ((Bank::max('id') ?? 0) + 1), 4, '0', STR_PAD_LEFT);
+        $bank = Bank::create([...$data,'is_active'=>true]);
+        if ($request->expectsJson()) return response()->json(['id'=>$bank->id,'name'=>$bank->name,'code'=>$bank->code], 201);
         return back()->with('success','Banco registrado correctamente.');
     }
 
@@ -94,7 +96,9 @@ class BusinessPartnerController extends Controller
             'currency'=>['required', Rule::in(['PEN','USD'])], 'account_number'=>['required','max:100','unique:bank_accounts,account_number'], 'holder_name'=>['nullable','max:255'],
         ]);
         $data['bank_name'] = Bank::findOrFail($data['bank_id'])->name;
-        BankAccount::create([...$data,'is_active'=>true]);
+        $account = BankAccount::create([...$data,'is_active'=>true]);
+        $account->load(['partner','bank']);
+        if ($request->expectsJson()) return response()->json(['id'=>$account->id,'partner'=>$account->partner->name,'bank'=>$account->bank->name,'type'=>$account->account_type,'currency'=>$account->currency,'number'=>$account->account_number,'holder'=>$account->holder_name], 201);
         return back()->with('success','Cuenta bancaria registrada para el proveedor.');
     }
 
