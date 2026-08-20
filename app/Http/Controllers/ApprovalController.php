@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Requirement;
 use App\Models\RequirementItem;
+use App\Models\PurchaseOrder;
 use App\Services\RequirementPdfGenerator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +22,7 @@ class ApprovalController extends Controller
     public function index(Request $request)
     {
         $this->allowed();
+        $approvalSection = $request->string('seccion')->toString() === 'ordenes' ? 'ordenes' : 'requerimientos';
         $activeStatus = in_array($request->string('estado')->toString(), array_merge(['Todos'], self::STATUSES), true)
             ? $request->string('estado')->toString()
             : 'Todos';
@@ -47,7 +49,11 @@ class ApprovalController extends Controller
             $requirements = $items->getCollection()->pluck('requirement')->filter()->unique('id');
         }
 
-        return view('approvals.index', compact('items', 'requirements', 'activeStatus', 'counts', 'totalRequirements'));
+        $purchaseOrders = $approvalSection === 'ordenes'
+            ? PurchaseOrder::with(['supplier', 'creator', 'items'])->latest()->paginate(12, ['*'], 'ordenes_page')->withQueryString()
+            : collect();
+
+        return view('approvals.index', compact('items', 'requirements', 'activeStatus', 'counts', 'totalRequirements', 'approvalSection', 'purchaseOrders'));
     }
 
     public function decideItem(Request $request, RequirementItem $requirementItem)
@@ -102,6 +108,14 @@ class ApprovalController extends Controller
         });
 
         return back()->with('success', 'Las decisiones fueron eliminadas y todos los ítems volvieron a Pendiente.');
+    }
+
+    public function decidePurchaseOrder(Request $request, PurchaseOrder $purchaseOrder)
+    {
+        $this->allowed();
+        $status = $request->validate(['status' => ['required', Rule::in(['Aprobada', 'Anulada'])]])['status'];
+        $purchaseOrder->update(['status' => $status]);
+        return redirect()->route('approvals.index', ['seccion' => 'ordenes'])->with('success', "Orden {$purchaseOrder->code} marcada como {$status}.");
     }
 
     public function pdf(Request $request, Requirement $requirement, RequirementPdfGenerator $generator)

@@ -3,6 +3,11 @@
 @section('content')
 <div class="breadcrumb">ALMACÉN › Aprobaciones</div>
 <div class="heading"><div><h1>Aprobaciones por ítem</h1><p>Cada producto se decide de forma independiente y conserva su trazabilidad.</p></div></div>
+<nav class="partner-tabs" aria-label="Tipo de documento"><a class="{{ $approvalSection==='requerimientos'?'active':'' }}" href="{{ route('approvals.index') }}">▤ Requerimientos</a><a class="{{ $approvalSection==='ordenes'?'active':'' }}" href="{{ route('approvals.index',['seccion'=>'ordenes']) }}">▧ Órdenes de compra</a></nav>
+
+@if($approvalSection==='ordenes')
+<div class="card approval-items-board"><header><div><h2>Órdenes de compra y servicio</h2><p>Aprueba o anula los documentos emitidos antes de su ejecución.</p></div><span class="badge pendiente">{{ $purchaseOrders->total() }} orden(es)</span></header><div class="table-wrap"><table><thead><tr><th>Documento</th><th>Proveedor</th><th>Destino</th><th>Moneda / total</th><th>Creado por</th><th>Estado</th><th>Decisión</th></tr></thead><tbody>@forelse($purchaseOrders as $order)<tr><td><code>{{ $order->code }}</code><small>{{ $order->created_at->format('d/m/Y H:i') }}</small></td><td><strong>{{ $order->supplier?->name }}</strong><small>{{ $order->items->count() }} ítem(s)</small></td><td>{{ $order->destination_branch }}<small>{{ $order->destination_warehouse }}</small></td><td>{{ $order->currency === 'USD' ? 'US$' : 'S/' }} {{ number_format((float)$order->total,2) }}</td><td>{{ $order->creator?->name ?: '—' }}</td><td><span class="badge {{ strtolower($order->status) }}">{{ $order->status }}</span></td><td><div class="item-decision-actions">@if($order->status!=='Aprobada')<form method="post" action="{{ route('approvals.purchase-orders.decide',$order) }}">@csrf<input type="hidden" name="status" value="Aprobada"><button class="status-action aprobado">✓ Aprobar</button></form>@endif @if($order->status!=='Anulada')<form method="post" action="{{ route('approvals.purchase-orders.decide',$order) }}">@csrf<input type="hidden" name="status" value="Anulada"><button class="status-action anulado">⊘ Anular</button></form>@endif</div></td></tr>@empty<tr><td colspan="7"><div class="empty-state"><b>▧</b><p>No hay órdenes registradas para aprobar.</p></div></td></tr>@endforelse</tbody></table></div>{{ $purchaseOrders->links() }}</div>
+@else
 
 @php
     $tabs = [
@@ -67,6 +72,7 @@
     <footer><button type="button" data-close>Cerrar</button><div class="approval-modal-actions"><form method="post" action="{{ route('approvals.decide',$requirement) }}">@csrf<input type="hidden" name="status" value="Anulado"><button class="reject" type="submit">⊘ Anular total</button></form><form method="post" action="{{ route('approvals.decide',$requirement) }}">@csrf<input type="hidden" name="status" value="Aprobado"><button class="approve" type="submit">✓ Aprobar total</button></form></div></footer>
 </dialog>
 @endforeach
+@endif
 @endsection
 @push('scripts')
 <script>
