@@ -16,6 +16,7 @@ use App\Http\Controllers\RequirementController;
 use App\Http\Controllers\ResponsibleController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\DailyReportController;
+use App\Http\Controllers\CostCenterController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -51,6 +52,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/configuracion/openai',[OpenAiSettingController::class,'edit'])->name('settings.openai.edit'); Route::put('/configuracion/openai',[OpenAiSettingController::class,'update'])->name('settings.openai.update');
     Route::get('/logistica/clientes-proveedores',[BusinessPartnerController::class,'index'])->name('business-partners.index'); Route::post('/logistica/clientes-proveedores/consultar',[BusinessPartnerController::class,'lookup'])->name('business-partners.lookup'); Route::post('/logistica/clientes-proveedores',[BusinessPartnerController::class,'store'])->name('business-partners.store'); Route::put('/logistica/clientes-proveedores/{businessPartner}',[BusinessPartnerController::class,'update'])->name('business-partners.update'); Route::delete('/logistica/clientes-proveedores/{businessPartner}',[BusinessPartnerController::class,'destroy'])->name('business-partners.destroy');
     Route::get('/logistica/ordenes-compra',[PurchaseOrderController::class,'index'])->name('purchase-orders.index'); Route::post('/logistica/ordenes-compra',[PurchaseOrderController::class,'store'])->name('purchase-orders.store'); Route::post('/logistica/ordenes-compra/proveedores',[PurchaseOrderController::class,'storeSupplier'])->name('purchase-orders.suppliers.store'); Route::post('/logistica/ordenes-compra/cuentas-bancarias',[PurchaseOrderController::class,'storeBankAccount'])->name('purchase-orders.bank-accounts.store');
+    Route::get('/costos/centro-costos',[CostCenterController::class,'index'])->name('cost-centers.index'); Route::post('/costos/centro-costos',[CostCenterController::class,'store'])->name('cost-centers.store'); Route::put('/costos/centro-costos/{costCenter}',[CostCenterController::class,'update'])->name('cost-centers.update'); Route::delete('/costos/centro-costos/{costCenter}',[CostCenterController::class,'destroy'])->name('cost-centers.destroy');
     Route::get('/configuracion/api-documentos',[DocumentApiSettingController::class,'edit'])->name('settings.document-api.edit'); Route::put('/configuracion/api-documentos',[DocumentApiSettingController::class,'update'])->name('settings.document-api.update');
     Route::get('/parte-diario-digital',[DailyReportController::class,'index'])->name('daily-reports.index');
     Route::get('/parte-diario-digital/registro-cartillas',[DailyReportController::class,'records'])->name('daily-reports.records');

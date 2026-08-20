@@ -32,6 +32,11 @@
                 <a data-label="Órdenes de compra" title="Órdenes de compra" class="{{ request()->routeIs('purchase-orders.*')?'active':'' }}" href="{{ route('purchase-orders.index') }}"><span class="nav-icon">▤</span><span class="nav-label">Órdenes de compra</span></a>
             </div></div>
             @endif
+            @if(auth()->user()->canAccess('costs'))
+            <div class="module" data-module="costs"><button class="module-title" type="button" title="Contraer Costos" aria-expanded="true"><span class="module-icon">▦</span><span class="module-label">COSTOS</span><span class="module-chevron">⌃</span></button><div class="module-links">
+                <a data-label="Centro de Costos" title="Centro de Costos" class="{{ request()->routeIs('cost-centers.*')?'active':'' }}" href="{{ route('cost-centers.index') }}"><span class="nav-icon">◫</span><span class="nav-label">Centro de Costos</span></a>
+            </div></div>
+            @endif
             @if(auth()->user()->canAccess('daily-reports'))
             <div class="module" data-module="daily-reports"><button class="module-title" type="button" title="Contraer Parte Diario Digital" aria-expanded="true"><span class="module-icon">▤</span><span class="module-label">PARTE DIARIO DIGITAL</span><span class="module-chevron">⌃</span></button><div class="module-links">
                 <a data-label="Creación de Cartillas" title="Creación de Cartillas" class="{{ request()->routeIs('daily-reports.index','daily-reports.create','daily-reports.edit','daily-reports.preview')?'active':'' }}" href="{{ route('daily-reports.index') }}"><span class="nav-icon">✚</span><span class="nav-label">Creación de Cartillas</span></a>
