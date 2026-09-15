@@ -5,17 +5,21 @@ namespace App\Http\Controllers;
 use App\Models\Product;
 use App\Models\ProductReception;
 use App\Models\BusinessPartner;
+use App\Models\Warehouse;
+use App\Models\InventoryStock;
+use App\Models\InventoryMovement;
 use App\Services\OpenAiDocumentReader;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class ProductReceptionController extends Controller
 {
     private function allowed(): void
     {
-        abort_unless(auth()->user()->canAccess('products'), 403);
+        abort_unless(auth()->user()->canAccess('warehouse.receptions'), 403);
     }
 
     public function index(Request $request)
@@ -35,7 +39,8 @@ class ProductReceptionController extends Controller
             ->count();
         $nextCode = $this->formatCode((ProductReception::max('id') ?? 0) + 1);
 
-        return view('product-receptions.index', compact('receptions', 'products', 'supplierCount', 'nextCode'));
+        $warehouses = Warehouse::with('branch')->where('is_active',true)->orderBy('name')->get();
+        return view('product-receptions.index', compact('receptions', 'products', 'supplierCount', 'nextCode', 'warehouses'));
     }
 
     public function searchSuppliers(Request $request)
@@ -68,7 +73,7 @@ class ProductReceptionController extends Controller
             'order_number' => ['nullable', 'string', 'max:100'],
             'order_file' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
             'order_camera' => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:10240'],
-            'warehouse' => ['required', 'string', 'max:150'],
+            'warehouse' => ['required', 'string', 'max:150', Rule::exists('warehouses','name')->where('is_active',true)],
             'notes' => ['nullable', 'string', 'max:1000'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer', 'distinct', 'exists:products,id'],
@@ -89,8 +94,9 @@ class ProductReceptionController extends Controller
             }
         }
 
+        $warehouse = Warehouse::where('name',$data['warehouse'])->where('is_active',true)->firstOrFail();
         try {
-            DB::transaction(function () use ($data, $storedFiles) {
+            DB::transaction(function () use ($data, $storedFiles, $warehouse) {
             $sequence = (ProductReception::lockForUpdate()->max('id') ?? 0) + 1;
             $reception = ProductReception::create([
                 'code' => $this->formatCode($sequence),
@@ -118,7 +124,7 @@ class ProductReceptionController extends Controller
                 $stockBefore = (int) $product->stock;
                 $stockAfter = $stockBefore + (int) $item['quantity'];
                 $product->update(['stock' => $stockAfter]);
-                $reception->items()->create([
+                $receptionItem=$reception->items()->create([
                     'product_id' => $product->id,
                     'product_code' => $product->code,
                     'product_name' => $product->name,
@@ -127,6 +133,9 @@ class ProductReceptionController extends Controller
                     'stock_before' => $stockBefore,
                     'stock_after' => $stockAfter,
                 ]);
+                $inventoryStock=InventoryStock::firstOrCreate(['product_id'=>$product->id,'warehouse_id'=>$warehouse->id],['quantity'=>0]);
+                $inventoryStock->increment('quantity',$item['quantity']);
+                InventoryMovement::create(['code'=>'REC-'.str_pad((string)$receptionItem->id,6,'0',STR_PAD_LEFT),'occurred_at'=>$data['received_at'].' 12:00:00','type'=>'Entrada','product_id'=>$product->id,'destination_warehouse_id'=>$warehouse->id,'quantity'=>$item['quantity'],'reference'=>$reception->code,'product_reception_item_id'=>$receptionItem->id,'created_by'=>auth()->id()]);
             }
             });
         } catch (\Throwable $exception) {
@@ -165,13 +174,19 @@ class ProductReceptionController extends Controller
             $products = [];
             foreach ($reception->items as $item) {
                 $product = Product::lockForUpdate()->find($item->product_id);
-                if (! $product || (int) $product->stock !== (int) $item->stock_after) {
+                $movement=InventoryMovement::where('product_reception_item_id',$item->id)->first();
+                $stock=$movement?->destination_warehouse_id ? InventoryStock::where('product_id',$item->product_id)->where('warehouse_id',$movement->destination_warehouse_id)->lockForUpdate()->first() : null;
+                $hasLaterMovement=$movement && InventoryMovement::where('product_id',$item->product_id)->where('id','>',$movement->id)->exists();
+                $legacyStockChanged=!$movement && (float)$product?->stock !== (float)$item->stock_after;
+                if (! $product || $legacyStockChanged || $hasLaterMovement || (float)$product->stock < (float)$item->quantity || ($movement && (!$stock || (float)$stock->quantity < (float)$item->quantity))) {
                     return false;
                 }
-                $products[] = [$product, (int) $item->stock_before];
+                $products[] = [$product, $stock, $movement, (float)$item->quantity];
             }
-            foreach ($products as [$product, $stockBefore]) {
-                $product->update(['stock' => $stockBefore]);
+            foreach ($products as [$product,$stock,$movement,$quantity]) {
+                $product->decrement('stock',$quantity);
+                if($stock)$stock->decrement('quantity',$quantity);
+                $movement?->delete();
             }
             $reception->delete();
 

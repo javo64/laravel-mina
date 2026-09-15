@@ -18,7 +18,7 @@ class DailyReportController extends Controller
 
     private function allowed(): void
     {
-        abort_unless(auth()->user()->canAccess('daily-reports'), 403);
+        abort_unless(auth()->user()->canAccess('daily-reports.forms'), 403);
     }
 
     private function canManage(DailyReportForm $form): void

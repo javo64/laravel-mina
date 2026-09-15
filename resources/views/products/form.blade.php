@@ -13,8 +13,8 @@
 
     <div class="form-section-title inventory-title"><strong>Precio e inventario</strong><span>Define el valor y las existencias iniciales</span></div>
     <label class="span-3">Moneda<select name="currency"><option value="PEN" {{ old('currency',optional($product)->currency ?? 'PEN')==='PEN'?'selected':'' }}>Soles (PEN)</option><option value="USD" {{ old('currency',optional($product)->currency)==='USD'?'selected':'' }}>Dólares (USD)</option></select></label>
-    <label class="span-3">Precio de venta *<span class="price-input"><b>S/</b><input type="number" step="0.01" min="0.01" name="price" required value="{{ old('price',optional($product)->price ?? '') }}"></span></label>
-    <label class="span-3">Stock inicial *<input type="number" min="1" name="stock" value="{{ old('stock',optional($product)->stock ?? 1) }}"></label>
+    <label class="span-3">Precio de venta <small>Opcional</small><span class="price-input"><b>S/</b><input type="number" step="0.01" min="0" name="price" value="{{ old('price',optional($product)->price ?? '') }}" placeholder="0.00"></span></label>
+    <label class="span-3">Stock inicial<input type="number" min="0" name="stock" value="{{ old('stock',optional($product)->stock ?? 0) }}"></label>
     <label class="span-3">Stock mínimo<input type="number" min="0" name="min_stock" value="{{ old('min_stock',optional($product)->min_stock ?? 1) }}"></label>
     <label class="span-3">Código interno<input value="{{ optional($product)->code ?: 'Se generará automáticamente' }}" readonly></label>
     <label class="span-3">Código de barras *<input name="barcode" required value="{{ old('barcode',optional($product)->barcode) }}" placeholder="Escanea o escribe el código"></label>

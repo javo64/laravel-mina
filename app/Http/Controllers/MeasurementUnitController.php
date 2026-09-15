@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 
 class MeasurementUnitController extends Controller
 {
-    private function allowed(): void { abort_unless(auth()->user()->canAccess('products'), 403); }
+    private function allowed(): void { abort_unless(auth()->user()->canAccess('warehouse.products'), 403); }
 
     public function store(Request $request)
     {

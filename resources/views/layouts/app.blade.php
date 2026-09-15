@@ -16,39 +16,47 @@
         </div>
         <div class="company" title="Fabulosa Company · {{ auth()->user()->branch }}"><span>FC</span><div><strong>Fabulosa Company</strong><small>{{ auth()->user()->branch }}</small></div></div>
         <nav aria-label="Módulos principales"><p>MÓDULOS</p>
-            @if(auth()->user()->canAccess('products')||auth()->user()->canAccess('requirements')||auth()->user()->canAccess('approvals'))
+            @if(auth()->user()->canAccess('warehouse.products')||auth()->user()->canAccess('warehouse.receptions')||auth()->user()->canAccess('warehouse.inventory')||auth()->user()->canAccess('warehouse.structure')||auth()->user()->canAccess('warehouse.requirements')||auth()->user()->canAccess('warehouse.approvals'))
             <div class="module" data-module="warehouse"><button class="module-title" type="button" title="Contraer Almacén" aria-expanded="true"><span class="module-icon">▦</span><span class="module-label">ALMACÉN</span><span class="module-chevron">⌃</span></button><div class="module-links">
-                @if(auth()->user()->canAccess('products'))
+                @if(auth()->user()->canAccess('warehouse.products'))
                 <a data-label="Productos y Servicios" title="Productos y Servicios" class="{{ request()->routeIs('products.*')?'active':'' }}" href="{{ route('products.index') }}"><span class="nav-icon">◈</span><span class="nav-label">Productos y Servicios</span></a>
-                <a data-label="Recepción de Productos" title="Recepción de Productos" class="{{ request()->routeIs('product-receptions.*')?'active':'' }}" href="{{ route('product-receptions.index') }}"><span class="nav-icon">↓</span><span class="nav-label">Recepción de Productos</span></a>
-                <a data-label="Almacenes y Sucursales" title="Almacenes y Sucursales" class="{{ request()->routeIs('branches.*','warehouses.*')?'active':'' }}" href="{{ route('branches.index') }}"><span class="nav-icon">◇</span><span class="nav-label">Almacenes y Sucursales</span></a>
                 @endif
-                @if(auth()->user()->canAccess('requirements'))<a data-label="Requerimientos" title="Requerimientos" class="{{ request()->routeIs('requirements.*')?'active':'' }}" href="{{ route('requirements.index') }}"><span class="nav-icon">▤</span><span class="nav-label">Requerimientos</span></a>@endif
-                @if(auth()->user()->canAccess('approvals'))<a data-label="Aprobaciones" title="Aprobaciones" class="{{ request()->routeIs('approvals.*')?'active':'' }}" href="{{ route('approvals.index') }}"><span class="nav-icon">✓</span><span class="nav-label">Aprobaciones</span></a>@endif
+                @if(auth()->user()->canAccess('warehouse.receptions'))
+                <a data-label="Recepción de Productos" title="Recepción de Productos" class="{{ request()->routeIs('product-receptions.*')?'active':'' }}" href="{{ route('product-receptions.index') }}"><span class="nav-icon">↓</span><span class="nav-label">Recepción de Productos</span></a>
+                @endif
+                @if(auth()->user()->canAccess('warehouse.inventory'))
+                <a data-label="Inventario" title="Inventario" class="{{ request()->routeIs('inventory.*')?'active':'' }}" href="{{ route('inventory.index') }}"><span class="nav-icon">▦</span><span class="nav-label">Inventario</span></a>
+                @endif
+                @if(auth()->user()->canAccess('warehouse.structure'))
+                <a data-label="Empresas, Almacenes y Sucursales" title="Empresas, Almacenes y Sucursales" class="{{ request()->routeIs('branches.*','warehouses.*')?'active':'' }}" href="{{ route('branches.index') }}"><span class="nav-icon">◇</span><span class="nav-label">Empresas, Almacenes y Sucursales</span></a>
+                @endif
+                @if(auth()->user()->canAccess('warehouse.requirements'))<a data-label="Requerimientos" title="Requerimientos" class="{{ request()->routeIs('requirements.*')?'active':'' }}" href="{{ route('requirements.index') }}"><span class="nav-icon">▤</span><span class="nav-label">Requerimientos</span></a>@endif
+                @if(auth()->user()->canAccess('warehouse.approvals'))<a data-label="Aprobaciones" title="Aprobaciones" class="{{ request()->routeIs('approvals.*')?'active':'' }}" href="{{ route('approvals.index') }}"><span class="nav-icon">✓</span><span class="nav-label">Aprobaciones</span></a>@endif
             </div></div>
             @endif
-            @if(auth()->user()->canAccess('logistics'))
+            @if(auth()->user()->canAccess('logistics.partners')||auth()->user()->canAccess('logistics.quotations')||auth()->user()->canAccess('logistics.purchase-orders'))
             <div class="module" data-module="logistics"><button class="module-title" type="button" title="Contraer Logística" aria-expanded="true"><span class="module-icon">♜</span><span class="module-label">LOGÍSTICA</span><span class="module-chevron">⌃</span></button><div class="module-links">
-                <a data-label="Clientes y Proveedores" title="Clientes y Proveedores" class="{{ request()->routeIs('business-partners.*')?'active':'' }}" href="{{ route('business-partners.index') }}"><span class="nav-icon">♙</span><span class="nav-label">Clientes y Proveedores</span></a>
-                <a data-label="Órdenes de compra" title="Órdenes de compra" class="{{ request()->routeIs('purchase-orders.*')?'active':'' }}" href="{{ route('purchase-orders.index') }}"><span class="nav-icon">▤</span><span class="nav-label">Órdenes de compra</span></a>
+                @if(auth()->user()->canAccess('logistics.partners'))<a data-label="Clientes y Proveedores" title="Clientes y Proveedores" class="{{ request()->routeIs('business-partners.*')?'active':'' }}" href="{{ route('business-partners.index') }}"><span class="nav-icon">♙</span><span class="nav-label">Clientes y Proveedores</span></a>@endif
+                @if(auth()->user()->canAccess('logistics.quotations'))<a data-label="Cotizaciones" title="Cotizaciones" class="{{ request()->routeIs('quotations.*')?'active':'' }}" href="{{ route('quotations.index') }}"><span class="nav-icon">▧</span><span class="nav-label">Cotizaciones</span></a>@endif
+                @if(auth()->user()->canAccess('logistics.purchase-orders'))<a data-label="Órdenes de compra" title="Órdenes de compra" class="{{ request()->routeIs('purchase-orders.*')?'active':'' }}" href="{{ route('purchase-orders.index') }}"><span class="nav-icon">▤</span><span class="nav-label">Órdenes de compra</span></a>@endif
             </div></div>
             @endif
-            @if(auth()->user()->canAccess('costs'))
+            @if(auth()->user()->canAccess('costs.cost-centers'))
             <div class="module" data-module="costs"><button class="module-title" type="button" title="Contraer Costos" aria-expanded="true"><span class="module-icon">▦</span><span class="module-label">COSTOS</span><span class="module-chevron">⌃</span></button><div class="module-links">
                 <a data-label="Centro de Costos" title="Centro de Costos" class="{{ request()->routeIs('cost-centers.*')?'active':'' }}" href="{{ route('cost-centers.index') }}"><span class="nav-icon">◫</span><span class="nav-label">Centro de Costos</span></a>
             </div></div>
             @endif
-            @if(auth()->user()->canAccess('daily-reports'))
+            @if(auth()->user()->canAccess('daily-reports.forms'))
             <div class="module" data-module="daily-reports"><button class="module-title" type="button" title="Contraer Parte Diario Digital" aria-expanded="true"><span class="module-icon">▤</span><span class="module-label">PARTE DIARIO DIGITAL</span><span class="module-chevron">⌃</span></button><div class="module-links">
                 <a data-label="Creación de Cartillas" title="Creación de Cartillas" class="{{ request()->routeIs('daily-reports.index','daily-reports.create','daily-reports.edit','daily-reports.preview')?'active':'' }}" href="{{ route('daily-reports.index') }}"><span class="nav-icon">✚</span><span class="nav-label">Creación de Cartillas</span></a>
                 <a data-label="Registro de Cartillas" title="Registro de Cartillas" class="{{ request()->routeIs('daily-reports.records','daily-reports.fill')?'active':'' }}" href="{{ route('daily-reports.records') }}"><span class="nav-icon">◫</span><span class="nav-label">Registro de Cartillas</span></a>
             </div></div>
             @endif
-            @if(auth()->user()->canAccess('users'))
+            @if(auth()->user()->canAccess('administration.users')||auth()->user()->canAccess('administration.openai')||auth()->user()->canAccess('administration.document-api'))
             <div class="module admin" data-module="administration"><button class="module-title" type="button" title="Contraer Administración" aria-expanded="true"><span class="module-icon">♙</span><span class="module-label">ADMINISTRACIÓN</span><span class="module-chevron">⌃</span></button><div class="module-links">
-                <a data-label="Usuarios" title="Usuarios" class="{{ request()->routeIs('users.*')?'active':'' }}" href="{{ route('users.index') }}"><span class="nav-icon">♟</span><span class="nav-label">Usuarios</span></a>
-                <a data-label="Configuración OpenAI" title="Configuración OpenAI" class="{{ request()->routeIs('settings.openai.*')?'active':'' }}" href="{{ route('settings.openai.edit') }}"><span class="nav-icon">✦</span><span class="nav-label">Configuración OpenAI</span></a>
-                <a data-label="API de documentos" title="API de documentos" class="{{ request()->routeIs('settings.document-api.*')?'active':'' }}" href="{{ route('settings.document-api.edit') }}"><span class="nav-icon">⌁</span><span class="nav-label">API de documentos</span></a>
+                @if(auth()->user()->canAccess('administration.users'))<a data-label="Usuarios" title="Usuarios" class="{{ request()->routeIs('users.*')?'active':'' }}" href="{{ route('users.index') }}"><span class="nav-icon">♟</span><span class="nav-label">Usuarios</span></a>@endif
+                @if(auth()->user()->canAccess('administration.openai'))<a data-label="Configuración OpenAI" title="Configuración OpenAI" class="{{ request()->routeIs('settings.openai.*')?'active':'' }}" href="{{ route('settings.openai.edit') }}"><span class="nav-icon">✦</span><span class="nav-label">Configuración OpenAI</span></a>@endif
+                @if(auth()->user()->canAccess('administration.document-api'))<a data-label="API de documentos" title="API de documentos" class="{{ request()->routeIs('settings.document-api.*')?'active':'' }}" href="{{ route('settings.document-api.edit') }}"><span class="nav-icon">⌁</span><span class="nav-label">API de documentos</span></a>@endif
             </div></div>
             @endif
         </nav>

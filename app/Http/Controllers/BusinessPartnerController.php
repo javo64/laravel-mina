@@ -11,18 +11,19 @@ use App\Services\DocumentLookupService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class BusinessPartnerController extends Controller
 {
     private function allowed(): void
     {
-        abort_unless(auth()->user()->canAccess('logistics'), 403);
+        abort_unless(auth()->user()->canAccess('logistics.partners'), 403);
     }
 
     public function index(Request $request)
     {
         $this->allowed();
-        $partners = BusinessPartner::when($request->type, fn ($query, $type) => $query->where('type', $type))
+        $partners = BusinessPartner::with('bankAccounts.bank')->when($request->type, fn ($query, $type) => $query->where('type', $type))
             ->when($request->q, fn ($query, $value) => $query->where(fn ($search) => $search
                 ->where('document_number', 'like', "%$value%")
                 ->orWhere('name', 'like', "%$value%")
@@ -51,6 +52,7 @@ class BusinessPartnerController extends Controller
         $data = $this->validated($request);
         $accounts = $data['bank_accounts'] ?? [];
         unset($data['bank_accounts']);
+        $this->validateAccountNumbers($accounts);
         $data['created_by'] = auth()->id();
         $data['is_active'] = $request->boolean('is_active', true);
         DB::transaction(function () use ($data, $accounts) {
@@ -63,7 +65,7 @@ class BusinessPartnerController extends Controller
                     'business_partner_id' => $partner->id,
                     'bank_name' => $bank->name,
                     'holder_name' => $account['holder_name'] ?: $partner->name,
-                    'is_active' => true,
+                    'is_active' => (bool) ($account['is_active'] ?? true),
                 ]);
             }
         });
@@ -76,8 +78,29 @@ class BusinessPartnerController extends Controller
     {
         $this->allowed();
         $data = $this->validated($request, $businessPartner);
+        $accounts = $data['bank_accounts'] ?? [];
+        unset($data['bank_accounts']);
+        $this->validateAccountNumbers($accounts, $businessPartner);
         $data['is_active'] = $request->boolean('is_active');
-        $businessPartner->update($data);
+        DB::transaction(function () use ($businessPartner, $data, $accounts): void {
+            $businessPartner->update($data);
+            foreach ($accounts as $account) {
+                if (blank($account['bank_id'] ?? null) || blank($account['account_number'] ?? null)) continue;
+                $bank = Bank::findOrFail($account['bank_id']);
+                $values = [
+                    'bank_id' => $bank->id, 'bank_name' => $bank->name,
+                    'account_type' => $account['account_type'], 'currency' => $account['currency'],
+                    'account_number' => $account['account_number'],
+                    'holder_name' => $account['holder_name'] ?: $businessPartner->name,
+                    'is_active' => (bool) ($account['is_active'] ?? true),
+                ];
+                if (! empty($account['id'])) {
+                    $businessPartner->bankAccounts()->whereKey($account['id'])->firstOrFail()->update($values);
+                } else {
+                    $businessPartner->bankAccounts()->create($values);
+                }
+            }
+        });
 
         return back()->with('success', 'Cliente o proveedor actualizado.');
     }
@@ -154,11 +177,27 @@ class BusinessPartnerController extends Controller
             'phone' => ['nullable', 'string', 'max:30'],
             'email' => ['nullable', 'email', 'max:255'],
             'bank_accounts' => ['nullable', 'array'],
+            'bank_accounts.*.id' => ['nullable', 'integer', 'exists:bank_accounts,id'],
             'bank_accounts.*.bank_id' => ['nullable', Rule::exists('banks', 'id')->where('is_active', true)],
             'bank_accounts.*.account_type' => ['nullable', Rule::in(['Cuenta Corriente','Cuenta Interbancaria'])],
             'bank_accounts.*.currency' => ['nullable', Rule::in(['PEN','USD'])],
-            'bank_accounts.*.account_number' => ['nullable','max:100','distinct', Rule::unique('bank_accounts','account_number')],
+            'bank_accounts.*.account_number' => ['nullable','max:100','distinct'],
             'bank_accounts.*.holder_name' => ['nullable','max:255'],
+            'bank_accounts.*.is_active' => ['nullable','boolean'],
         ]);
+    }
+
+    private function validateAccountNumbers(array $accounts, ?BusinessPartner $partner = null): void
+    {
+        foreach ($accounts as $index => $account) {
+            if (blank($account['account_number'] ?? null)) continue;
+            $accountId = $account['id'] ?? null;
+            if ($accountId && (! $partner || ! $partner->bankAccounts()->whereKey($accountId)->exists())) {
+                throw ValidationException::withMessages(["bank_accounts.{$index}.id" => 'La cuenta bancaria no pertenece a este cliente o proveedor.']);
+            }
+            if (BankAccount::where('account_number', $account['account_number'])->when($accountId, fn ($query) => $query->where('id', '!=', $accountId))->exists()) {
+                throw ValidationException::withMessages(["bank_accounts.{$index}.account_number" => 'Este número de cuenta ya está registrado.']);
+            }
+        }
     }
 }

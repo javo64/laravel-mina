@@ -22,4 +22,9 @@ class BusinessPartner extends Model
     {
         return $this->belongsTo(User::class, 'created_by');
     }
+
+    public function bankAccounts()
+    {
+        return $this->hasMany(BankAccount::class, 'business_partner_id');
+    }
 }

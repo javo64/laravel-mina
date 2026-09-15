@@ -14,13 +14,13 @@
 <div class="stats">
     <article><span>▤</span><div><small>Total</small><strong>{{ \App\Models\Requirement::count() }}</strong></div></article>
     <article><span>◷</span><div><small>Pendientes</small><strong>{{ \App\Models\Requirement::where('status','Pendiente')->count() }}</strong></div></article>
-    <article><span>✓</span><div><small>Aprobados</small><strong>{{ \App\Models\Requirement::where('status','Aprobado')->count() }}</strong></div></article>
-    <article><span>×</span><div><small>Rechazados</small><strong>{{ \App\Models\Requirement::where('status','Rechazado')->count() }}</strong></div></article>
+    <article><span>✓</span><div><small>Aprobados total</small><strong>{{ \App\Models\Requirement::whereIn('status',['Aprobado','Aprobado total'])->count() }}</strong></div></article>
+    <article><span>◐</span><div><small>Aprobados parcial</small><strong>{{ \App\Models\Requirement::whereIn('status',['Parcial','Aprobado parcial'])->count() }}</strong></div></article>
 </div>
 <div class="card">
     <form class="toolbar"><label>⌕ <input name="q" value="{{ request('q') }}" placeholder="Buscar código, responsable o proyecto..."></label><button>Buscar</button></form>
     <div class="table-wrap"><table><thead><tr><th>Código</th><th>Fecha</th><th>Responsable</th><th>Proyecto</th><th>Área</th><th>Ítems</th><th>Prioridad</th><th>Estado</th>@if(auth()->user()->isAdministrator())<th></th>@endif</tr></thead><tbody>
-        @foreach($requirements as $item)<tr><td><code>{{ $item->code }}</code></td><td>{{ $item->requested_at->format('d/m/Y') }}</td><td><strong>{{ $item->responsible }}</strong></td><td>{{ $item->project }}</td><td><em>{{ $item->area }}</em></td><td>{{ $item->items->count() }}</td><td>{{ $item->priority }}</td><td><span class="badge {{ strtolower($item->status) }}">{{ $item->status }}</span></td>@if(auth()->user()->isAdministrator())<td>@if($item->status==='Pendiente' && ! $item->decision_at)<form method="post" action="{{ route('requirements.destroy',$item) }}" onsubmit="return confirm('¿Eliminar definitivamente este requerimiento?')">@csrf @method('DELETE')<button class="danger">Eliminar</button></form>@else<small title="Tiene una aprobación vinculada">Vinculado</small>@endif</td>@endif</tr>@endforeach
+        @foreach($requirements as $item)<tr><td><code>{{ $item->code }}</code></td><td>{{ $item->requested_at->format('d/m/Y') }}</td><td><strong>{{ $item->responsible }}</strong></td><td>{{ $item->project }}</td><td><em>{{ $item->area }}</em></td><td>{{ $item->items->count() }}</td><td>{{ $item->priority }}</td><td><span class="badge {{ \Illuminate\Support\Str::slug($item->status) }}">{{ $item->status }}</span></td>@if(auth()->user()->isAdministrator())<td>@if($item->status==='Pendiente' && ! $item->decision_at)<form method="post" action="{{ route('requirements.destroy',$item) }}" onsubmit="return confirm('¿Eliminar definitivamente este requerimiento?')">@csrf @method('DELETE')<button class="danger">Eliminar</button></form>@else<small title="Tiene una aprobación vinculada">Vinculado</small>@endif</td>@endif</tr>@endforeach
     </tbody></table></div>{{ $requirements->links() }}
 </div>
 
@@ -60,7 +60,7 @@
     </div>
 </dialog>
 
-<dialog class="requirement-dialog" id="new-requirement"><form method="post" action="{{ route('requirements.store') }}">@csrf
+<dialog class="requirement-dialog" id="new-requirement"><form method="post" enctype="multipart/form-data" action="{{ route('requirements.store') }}">@csrf
     <div class="modal-head product-modal-head"><span class="modal-icon">▤</span><div><h2>Nuevo requerimiento</h2><p>Ingresa los datos generales y selecciona productos registrados.</p></div><button type="button" data-close>×</button></div>
     <div class="requirement-form">
         <div class="form-section-title"><strong>Información del requerimiento</strong><span>Datos del solicitante y destino</span></div>
@@ -71,7 +71,7 @@
 
         <div class="requested-products-title"><div><strong>Productos solicitados</strong><span class="item-count">1 ítem</span><small>Busca entre {{ $products->count() }} productos registrados</small></div><button class="secondary add-item" type="button">＋ Agregar fila</button></div>
         <div class="requirement-items-wrap">
-            <div class="requirement-item-head"><span>N°</span><span>Rubro</span><span>Producto registrado</span><span></span><span>Centro de costos</span><span>Descripción</span><span>Cantidad</span><span>Unidad</span><span>Prioridad</span><span></span></div>
+            <div class="requirement-item-head"><span>N°</span><span>Rubro</span><span>Producto registrado</span><span></span><span>Centro de costos</span><span>Descripción</span><span>Foto / imagen</span><span>Cantidad</span><span>Unidad</span><span>Prioridad</span><span></span></div>
             <div class="requirement-items">
                 <div class="requirement-item-row">
                     <span class="row-number">1</span><input class="item-category" value="Automático" readonly>
@@ -79,6 +79,7 @@
                     <button class="new-product-inline" type="button" title="Crear producto">＋</button>
                     <select name="items[0][cost_center_id]" required><option value="">Seleccionar centro...</option>@foreach($costCenters as $costCenter)<option value="{{ $costCenter->id }}">{{ $costCenter->parent->name }} · {{ $costCenter->name }}</option>@endforeach</select>
                     <input name="items[0][description]" placeholder="Detalle o especificación">
+                    <label class="item-image-picker"><input type="file" name="items[0][image]" accept="image/jpeg,image/png,image/webp"><span>▧ Adjuntar imagen</span><small>JPG, PNG o WEBP · máx. 5 MB</small></label>
                     <input type="number" step="0.01" min="0.01" name="items[0][quantity]" value="1" required>
                     <input class="item-unit" value="Unidad" readonly>
                     <select name="items[0][priority]" required><option>Alta</option><option selected>Media</option><option>Baja</option></select>
@@ -93,7 +94,7 @@
 <template id="requirement-item-template"><div class="requirement-item-row">
     <span class="row-number">__NUMBER__</span><input class="item-category" value="Automático" readonly>
     <select class="item-product" name="items[__INDEX__][product_id]" required><option value="">Buscar producto...</option>@foreach($products as $product)<option value="{{ $product->id }}" data-category="{{ $product->category ?: 'Sin rubro' }}" data-unit="{{ $product->unit }}">{{ $product->name }}</option>@endforeach</select>
-    <button class="new-product-inline" type="button" title="Crear producto">＋</button><select name="items[__INDEX__][cost_center_id]" required><option value="">Seleccionar centro...</option>@foreach($costCenters as $costCenter)<option value="{{ $costCenter->id }}">{{ $costCenter->parent->name }} · {{ $costCenter->name }}</option>@endforeach</select><input name="items[__INDEX__][description]" placeholder="Detalle o especificación"><input type="number" step="0.01" min="0.01" name="items[__INDEX__][quantity]" value="1" required><input class="item-unit" value="Unidad" readonly><select name="items[__INDEX__][priority]" required><option>Alta</option><option selected>Media</option><option>Baja</option></select><button class="remove-item" type="button" title="Quitar fila">×</button>
+    <button class="new-product-inline" type="button" title="Crear producto">＋</button><select name="items[__INDEX__][cost_center_id]" required><option value="">Seleccionar centro...</option>@foreach($costCenters as $costCenter)<option value="{{ $costCenter->id }}">{{ $costCenter->parent->name }} · {{ $costCenter->name }}</option>@endforeach</select><input name="items[__INDEX__][description]" placeholder="Detalle o especificación"><label class="item-image-picker"><input type="file" name="items[__INDEX__][image]" accept="image/jpeg,image/png,image/webp"><span>▧ Adjuntar imagen</span><small>JPG, PNG o WEBP · máx. 5 MB</small></label><input type="number" step="0.01" min="0.01" name="items[__INDEX__][quantity]" value="1" required><input class="item-unit" value="Unidad" readonly><select name="items[__INDEX__][priority]" required><option>Alta</option><option selected>Media</option><option>Baja</option></select><button class="remove-item" type="button" title="Quitar fila">×</button>
 </div></template>
 
 <dialog class="product-dialog" id="new-product-from-requirement"><form method="post" action="{{ route('products.store') }}">@csrf<div class="modal-head product-modal-head"><span class="modal-icon">▣</span><div><h2>Nuevo producto o servicio</h2><p>Al guardar se agregará al catálogo general.</p></div><button type="button" data-close>×</button></div>@include('products.form',['product'=>null])<div class="modal-foot"><small>Después de guardarlo podrás seleccionarlo en el requerimiento.</small><button type="button" data-close>Cancelar</button><button class="primary">Guardar producto</button></div></form></dialog>
@@ -121,6 +122,10 @@
         });
         row.querySelector('.remove-item').addEventListener('click', () => { row.remove(); refresh(); });
         row.querySelector('.new-product-inline').addEventListener('click', () => document.getElementById('new-product-from-requirement').showModal());
+        row.querySelector('.item-image-picker input').addEventListener('change', event => {
+            const label = row.querySelector('.item-image-picker span');
+            label.textContent = event.target.files[0] ? `▧ ${event.target.files[0].name}` : '▧ Adjuntar imagen';
+        });
     };
     bind(rows.querySelector('.requirement-item-row'));
     document.getElementById('requirement-responsible').addEventListener('change', event => { if (event.target.value === '__new__') { event.target.value = ''; document.getElementById('responsibles').showModal(); } });

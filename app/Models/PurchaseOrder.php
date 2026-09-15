@@ -16,5 +16,6 @@ class PurchaseOrder extends Model
     public function supplier() { return $this->belongsTo(BusinessPartner::class, 'supplier_id'); }
     public function bankAccount() { return $this->belongsTo(BankAccount::class); }
     public function items() { return $this->hasMany(PurchaseOrderItem::class); }
+    public function quotations() { return $this->hasMany(PurchaseOrderQuotation::class); }
     public function creator() { return $this->belongsTo(User::class, 'created_by'); }
 }

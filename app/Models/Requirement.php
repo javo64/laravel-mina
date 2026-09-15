@@ -11,4 +11,5 @@ class Requirement extends Model
     protected function casts(): array { return ['requested_at' => 'date', 'decision_at' => 'datetime']; }
     public function items() { return $this->hasMany(RequirementItem::class); }
     public function decisionMaker(): BelongsTo { return $this->belongsTo(User::class, 'decision_by'); }
+    public function quotationProcess() { return $this->hasOne(QuotationProcess::class); }
 }

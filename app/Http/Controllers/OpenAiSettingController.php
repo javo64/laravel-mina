@@ -10,7 +10,7 @@ class OpenAiSettingController extends Controller
 {
     private function allowed(): void
     {
-        abort_unless(auth()->user()->canAccess('users'), 403);
+        abort_unless(auth()->user()->canAccess('administration.openai'), 403);
     }
 
     public function edit()

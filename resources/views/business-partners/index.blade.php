@@ -32,7 +32,7 @@
 <script>
 (() => {
     const dialog = document.getElementById('new-partner');
-    document.getElementById('add-partner-bank-account')?.addEventListener('click', () => { const box=document.getElementById('partner-bank-accounts'), index=Number(box.dataset.next || 1), row=box.firstElementChild.cloneNode(true); row.querySelectorAll('[name]').forEach(input => { input.name=input.name.replace(/\[0\]/, `[${index}]`); input.value=''; }); box.append(row); box.dataset.next=index+1; });
+    document.querySelectorAll('.add-partner-bank-account').forEach(button => button.addEventListener('click', () => { const box=button.closest('.partner-form').querySelector('.partner-bank-accounts'), index=Number(box.dataset.next || 1), row=box.firstElementChild.cloneNode(true); row.querySelectorAll('[name]').forEach(input => { input.name=input.name.replace(/\[\d+\]/, `[${index}]`); if(input.type==='hidden')input.value=''; else if(input.tagName==='SELECT')input.selectedIndex=0; else input.value=''; }); box.append(row); box.dataset.next=index+1; }));
     const documentInput = dialog.querySelector('[name="document_number"]');
     const status = dialog.querySelector('.lookup-status');
     dialog.querySelector('.lookup-document').addEventListener('click', async () => {
@@ -54,7 +54,7 @@
     const csrf = @json(csrf_token());
     const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char]));
     const requestJson = async form => { const response = await fetch(form.action, {method:'POST',headers:{'Accept':'application/json','X-CSRF-TOKEN':csrf},body:new FormData(form)}); const body=await response.json(); if(!response.ok) throw new Error(body.message || Object.values(body.errors || {}).flat()[0] || 'No se pudo guardar.'); return body; };
-    management.querySelector('#bank-form').addEventListener('submit', async event => { event.preventDefault(); const form=event.currentTarget; try { const bank=await requestJson(form); const list=management.querySelector('#bank-list'); list.querySelector('p')?.remove(); list.insertAdjacentHTML('afterbegin',`<div><strong>${escape(bank.name)}</strong><small>${escape(bank.code)}</small></div>`); document.querySelectorAll('#partner-bank-accounts select[name$="[bank_id]"]').forEach(select=>select.insertAdjacentHTML('beforeend',`<option value="${bank.id}">${escape(bank.name)}</option>`)); form.reset(); } catch(error) { alert(error.message); } });
+    management.querySelector('#bank-form').addEventListener('submit', async event => { event.preventDefault(); const form=event.currentTarget; try { const bank=await requestJson(form); const list=management.querySelector('#bank-list'); list.querySelector('p')?.remove(); list.insertAdjacentHTML('afterbegin',`<div><strong>${escape(bank.name)}</strong><small>${escape(bank.code)}</small></div>`); document.querySelectorAll('.partner-bank-accounts select[name$="[bank_id]"]').forEach(select=>select.insertAdjacentHTML('beforeend',`<option value="${bank.id}">${escape(bank.name)}</option>`)); form.reset(); } catch(error) { alert(error.message); } });
 })();
 </script>
 @endpush

@@ -6,24 +6,25 @@ use App\Models\Branch;
 use App\Models\Warehouse;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
+use App\Models\Company;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class BranchWarehouseController extends Controller
 {
-    private function allowed(): void { abort_unless(auth()->user()->canAccess('products'), 403); }
+    private function allowed(): void { abort_unless(auth()->user()->canAccess('warehouse.structure'), 403); }
 
     public function index()
     {
         $this->allowed();
-        $branches = Branch::with(['warehouses' => fn ($query) => $query->where('is_active', true)])->where('is_active', true)->orderBy('name')->get();
-        return view('branches-warehouses.index', compact('branches'));
+        $companies = Company::with(['branches'=>fn($query)=>$query->where('is_active',true)->with(['warehouses'=>fn($warehouses)=>$warehouses->where('is_active',true)])])->where('is_active',true)->orderBy('id')->get();
+        return view('branches-warehouses.index', compact('companies'));
     }
 
     public function storeBranch(Request $request)
     {
         $this->allowed();
-        $data = $request->validate(['name'=>['required','max:150','unique:branches,name'], 'address'=>['nullable','max:255']]);
+        $data = $request->validate(['company_id'=>['required',Rule::exists('companies','id')->where('is_active',true)],'name'=>['required','max:150','unique:branches,name'], 'address'=>['nullable','max:255']]);
         $data['code'] = 'SUC-'.str_pad((string) ((Branch::max('id') ?? 0) + 1), 4, '0', STR_PAD_LEFT);
         Branch::create([...$data, 'is_active'=>true, 'created_by'=>auth()->id()]);
         return back()->with('success', 'Sucursal registrada correctamente.');

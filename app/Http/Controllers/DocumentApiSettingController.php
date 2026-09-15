@@ -9,7 +9,7 @@ class DocumentApiSettingController extends Controller
 {
     private function allowed(): void
     {
-        abort_unless(auth()->user()->canAccess('users'), 403);
+        abort_unless(auth()->user()->canAccess('administration.document-api'), 403);
     }
 
     public function edit()

@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 
 class AreaController extends Controller
 {
-    private function allowed(): void { abort_unless(auth()->user()->canAccess('requirements'), 403); }
+    private function allowed(): void { abort_unless(auth()->user()->canAccess('warehouse.requirements'), 403); }
 
     public function store(Request $request)
     {

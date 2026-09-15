@@ -11,7 +11,7 @@ class CostCenterController extends Controller
 {
     private function allowed(): void
     {
-        abort_unless(auth()->user()->canAccess('costs'), 403);
+        abort_unless(auth()->user()->canAccess('costs.cost-centers'), 403);
     }
 
     public function index()

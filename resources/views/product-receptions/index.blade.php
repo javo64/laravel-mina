@@ -47,7 +47,7 @@
             <div class="supplier-autocomplete"><input id="reception-supplier" name="supplier" value="{{ old('supplier') }}" placeholder="Escribe al menos 2 letras..." autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="supplier-suggestions"><div class="supplier-suggestions" id="supplier-suggestions" role="listbox" hidden></div></div>
             <small class="supplier-help">Escribe 2 letras o números · {{ $supplierCount }} proveedor(es) activo(s)</small>
         </div>
-        <div class="reception-field rec-span-4"><label for="reception-warehouse">Almacén *</label><select id="reception-warehouse" name="warehouse" required><option>Almacén principal</option></select><small aria-hidden="true">&nbsp;</small></div>
+        <div class="reception-field rec-span-4"><label for="reception-warehouse">Almacén *</label><select id="reception-warehouse" name="warehouse" required><option value="">Seleccionar almacén</option>@foreach($warehouses as $warehouse)<option value="{{ $warehouse->name }}" @selected(old('warehouse')===$warehouse->name)>{{ $warehouse->name }}{{ $warehouse->branch ? ' · '.$warehouse->branch->name : '' }}</option>@endforeach</select><small aria-hidden="true">&nbsp;</small></div>
         <div class="reception-field reception-notes rec-span-8"><label for="reception-notes">Observaciones</label><textarea id="reception-notes" name="notes" rows="2" maxlength="1000" placeholder="Estado de entrega u observaciones">{{ old('notes') }}</textarea></div>
 
         <div class="form-section-title reception-doc-title"><strong>Documentos de sustento</strong><span>Formatos permitidos: PDF, JPG y PNG, hasta 10 MB por archivo</span></div>

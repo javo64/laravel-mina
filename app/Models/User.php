@@ -6,6 +6,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use App\Support\PermissionCatalog;
 
 class User extends Authenticatable
 {
@@ -33,7 +34,17 @@ class User extends Authenticatable
 
     public function canAccess(string $module): bool
     {
-        return $this->isAdministrator() || in_array($module, $this->permissions ?? [], true);
+        if ($this->isAdministrator()) return true;
+        $stored=$this->permissions??[];
+        if(isset(PermissionCatalog::LEGACY[$module])) return collect($stored)->contains(fn($permission)=>$permission===$module || in_array($permission,PermissionCatalog::LEGACY[$module],true));
+        return collect($stored)->contains(fn($permission)=>PermissionCatalog::grants($permission,$module));
+    }
+
+    public function landingRoute(): string
+    {
+        $routes=['warehouse.products'=>'products.index','warehouse.receptions'=>'product-receptions.index','warehouse.inventory'=>'inventory.index','warehouse.structure'=>'branches.index','warehouse.requirements'=>'requirements.index','warehouse.approvals'=>'approvals.index','logistics.partners'=>'business-partners.index','logistics.quotations'=>'quotations.index','logistics.purchase-orders'=>'purchase-orders.index','costs.cost-centers'=>'cost-centers.index','daily-reports.forms'=>'daily-reports.index','administration.users'=>'users.index','administration.openai'=>'settings.openai.edit','administration.document-api'=>'settings.document-api.edit'];
+        foreach($routes as $permission=>$route) if($this->canAccess($permission)) return $route;
+        return 'login';
     }
 
     public function isAdministrator(): bool

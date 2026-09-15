@@ -12,10 +12,12 @@ use App\Models\Responsible;
 use App\Models\CostCenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Throwable;
 
 class RequirementController extends Controller
 {
-    private function allowed(): void { abort_unless(auth()->user()->canAccess('requirements'), 403); }
+    private function allowed(): void { abort_unless(auth()->user()->canAccess('warehouse.requirements'), 403); }
 
     public function index(Request $request)
     {
@@ -48,31 +50,41 @@ class RequirementController extends Controller
             'items.*.quantity' => ['required','numeric','min:0.01'],
             'items.*.priority' => ['required','in:Alta,Media,Baja'],
             'items.*.cost_center_id' => ['required','exists:cost_centers,id'],
+            'items.*.image' => ['nullable','image','mimes:jpg,jpeg,png,webp','max:5120'],
         ]);
 
-        DB::transaction(function () use ($data) {
-            $sequence = (Requirement::max('id') ?? 0) + 1;
-            $weight = ['Baja' => 1, 'Media' => 2, 'Alta' => 3];
-            $generalPriority = collect($data['items'])->sortByDesc(fn ($item) => $weight[$item['priority']])->first()['priority'];
-            $requirement = Requirement::create([
-                'code' => 'REQ-'.now()->year.'-'.str_pad((string)$sequence, 4, '0', STR_PAD_LEFT),
-                'requested_at' => $data['requested_at'], 'responsible' => $data['responsible'],
-                'project' => $data['project'], 'area' => $data['area'],
-                'priority' => $generalPriority, 'status' => 'Pendiente',
-            ]);
-
-            foreach ($data['items'] as $item) {
-                $product = Product::where('is_active', true)->findOrFail($item['product_id']);
-                $costCenter = CostCenter::where('is_active', true)->whereNotNull('parent_id')->findOrFail($item['cost_center_id']);
-                $requirement->items()->create([
-                    'product_id' => $product->id, 'product_name' => $product->name,
-                    'category' => $product->category, 'unit' => $product->unit,
-                    'description' => $item['description'] ?? null,
-                    'quantity' => $item['quantity'], 'priority' => $item['priority'],
-                    'cost_center_id' => $costCenter->id, 'cost_center' => $costCenter->name,
+        $storedImages = [];
+        try {
+            DB::transaction(function () use ($data, $request, &$storedImages) {
+                $sequence = (Requirement::max('id') ?? 0) + 1;
+                $weight = ['Baja' => 1, 'Media' => 2, 'Alta' => 3];
+                $generalPriority = collect($data['items'])->sortByDesc(fn ($item) => $weight[$item['priority']])->first()['priority'];
+                $requirement = Requirement::create([
+                    'code' => 'REQ-'.now()->year.'-'.str_pad((string)$sequence, 4, '0', STR_PAD_LEFT),
+                    'requested_at' => $data['requested_at'], 'responsible' => $data['responsible'],
+                    'project' => $data['project'], 'area' => $data['area'],
+                    'priority' => $generalPriority, 'status' => 'Pendiente',
                 ]);
-            }
-        });
+
+                foreach ($data['items'] as $index => $item) {
+                    $product = Product::where('is_active', true)->findOrFail($item['product_id']);
+                    $costCenter = CostCenter::where('is_active', true)->whereNotNull('parent_id')->findOrFail($item['cost_center_id']);
+                    $imagePath = $request->file("items.{$index}.image")?->store('requirement-items', 'local');
+                    if ($imagePath) $storedImages[] = $imagePath;
+                    $requirement->items()->create([
+                        'product_id' => $product->id, 'product_name' => $product->name,
+                        'category' => $product->category, 'unit' => $product->unit,
+                        'description' => $item['description'] ?? null,
+                        'quantity' => $item['quantity'], 'priority' => $item['priority'],
+                        'cost_center_id' => $costCenter->id, 'cost_center' => $costCenter->name,
+                        'image_path' => $imagePath,
+                    ]);
+                }
+            });
+        } catch (Throwable $exception) {
+            Storage::disk('local')->delete($storedImages);
+            throw $exception;
+        }
 
         return back()->with('success', 'Requerimiento guardado como pendiente.');
     }
@@ -83,7 +95,9 @@ class RequirementController extends Controller
         if ($requirement->status !== 'Pendiente' || $requirement->decision_at || $requirement->decision_by) {
             return back()->withErrors('No se puede eliminar el requerimiento porque ya tiene un proceso de aprobación vinculado.');
         }
+        $images = $requirement->items()->whereNotNull('image_path')->pluck('image_path')->all();
         $requirement->delete();
+        Storage::disk('local')->delete($images);
 
         return back()->with('success', 'Requerimiento eliminado correctamente.');
     }
