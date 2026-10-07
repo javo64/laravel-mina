@@ -22,6 +22,7 @@ class QuotationController extends Controller
         $this->allowed();
         $availableItems = RequirementItem::with('requirement')
             ->whereIn('approval_status', ['Aprobado', 'Aprobado parcial'])
+            ->whereHas('requirement', fn ($query) => $query->whereIn('status', ['Aprobado', 'Aprobado total', 'Aprobado parcial', 'Aprobación']))
             ->whereDoesntHave('purchaseOrderItems')
             ->whereDoesntHave('quotationProcesses', fn ($query) => $query->whereIn('status', ['Pendiente aprobación', 'Aprobada']))
             ->latest('id')->get();
@@ -67,6 +68,7 @@ class QuotationController extends Controller
                 $items = RequirementItem::with('requirement')
                     ->whereKey($data['item_ids'])
                     ->whereIn('approval_status', ['Aprobado', 'Aprobado parcial'])
+                    ->whereHas('requirement', fn ($query) => $query->whereIn('status', ['Aprobado', 'Aprobado total', 'Aprobado parcial', 'Aprobación']))
                     ->whereDoesntHave('purchaseOrderItems')
                     ->whereDoesntHave('quotationProcesses', fn ($query) => $query->whereIn('status', ['Pendiente aprobación', 'Aprobada']))
                     ->lockForUpdate()->get();
