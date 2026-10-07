@@ -22,6 +22,7 @@ class BranchBankCatalogTest extends TestCase
         $plant=Company::where('name','PLANTA FABULOSA')->firstOrFail();
         $mine=Company::where('name','MINA CAROLINA JE')->firstOrFail();
         $this->actingAs($user)->get(route('branches.index'))->assertOk()->assertSee('PLANTA FABULOSA')->assertSee('MINA CAROLINA JE')->assertSee('Sucursal principal');
+        $this->actingAs($user)->post(route('companies.activate'), ['company_id'=>$mine->id])->assertRedirect();
         $this->actingAs($user)->post(route('branches.store'), ['company_id'=>$mine->id,'name'=>'Sucursal Norte'])->assertRedirect();
         $branch = Branch::where('name','Sucursal Norte')->firstOrFail();
         $this->assertSame($mine->id,$branch->company_id);

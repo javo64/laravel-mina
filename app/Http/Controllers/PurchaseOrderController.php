@@ -155,6 +155,16 @@ class PurchaseOrderController extends Controller
         ]);
     }
 
+    public function destroy(PurchaseOrder $purchaseOrder)
+    {
+        abort_unless(auth()->user()->isAdministrator(), 403);
+        if ($purchaseOrder->receptions()->exists()) {
+            return back()->withErrors('Primero debes revertir las recepciones vinculadas a esta orden.');
+        }
+        $purchaseOrder->delete();
+        return back()->with('success', 'Orden eliminada definitivamente. Los ítems aprobados vuelven a estar disponibles.');
+    }
+
     public function storeSupplier(Request $request)
     {
         $this->allowed();

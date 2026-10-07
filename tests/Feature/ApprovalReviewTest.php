@@ -36,7 +36,7 @@ class ApprovalReviewTest extends TestCase
             ->assertSee('Doble clic')->assertSee('approval-review-'.$requirement->id)
             ->assertSee('Filtro hidráulico')->assertSee(route('approvals.pdf', $requirement))
             ->assertSee('Cantidad requerida')->assertSee('Cantidad solicitada')
-            ->assertSee('Aprobado parcial')->assertSee('ESTADO DE APROBACIÓN')
+            ->assertSee('Visto Bueno')->assertSee('ESTADO DE APROBACIÓN')
             ->assertSee('Descargar PDF')->assertSee('sidebar-collapse')
             ->assertSee('Contraer menú')->assertSee('data-label="Aprobaciones"', false);
 

@@ -15,7 +15,7 @@
         <article class="daily-form-card">
             <div class="daily-card-icon">▤</div><div class="daily-card-main"><div class="daily-card-title"><h3>{{ $form->name }}</h3><span class="badge {{ $form->is_active?'aprobado':'rechazado' }}">{{ $form->is_active?'Activa':'Inactiva' }}</span></div>
             <p>{{ $form->description ?: 'Cartilla digital sin descripción.' }}</p><div class="daily-meta"><span>{{ $form->fields_count }} campos</span><span>{{ $form->reports_count }} registros</span>@if($form->use_gps)<span>⌖ GPS</span>@endif<span>{{ $form->scope ?: 'General' }}</span></div></div>
-            <div class="daily-card-actions">@if(auth()->user()->canAccess('users') || $form->created_by===auth()->id())<a href="{{ route('daily-reports.edit',$form) }}">Configurar</a><a href="{{ route('daily-reports.preview',$form) }}">Vista previa</a>@endif</div>
+            <div class="daily-card-actions">@if(auth()->user()->canAccess('users') || $form->created_by===auth()->id())<a href="{{ route('daily-reports.edit',$form) }}">Configurar</a><a href="{{ route('daily-reports.preview',$form) }}">Vista previa</a>@endif @if(auth()->user()->isAdministrator())<form method="post" action="{{ route('daily-reports.destroy',$form) }}" onsubmit="return confirm('¿Eliminar definitivamente la cartilla y todos sus registros?')">@csrf @method('DELETE')<button class="danger">Eliminar</button></form>@endif</div>
         </article>
         @empty <div class="empty-state">Aún no existen cartillas digitales disponibles.</div>@endforelse
     </div>{{ $forms->links() }}

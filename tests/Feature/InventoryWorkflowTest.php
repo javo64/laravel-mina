@@ -7,6 +7,8 @@ use App\Models\BusinessPartner;
 use App\Models\InventoryMovement;
 use App\Models\InventoryStock;
 use App\Models\Product;
+use App\Models\PurchaseOrder;
+use App\Models\Requirement;
 use App\Models\User;
 use App\Models\Warehouse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -19,10 +21,15 @@ class InventoryWorkflowTest extends TestCase
     public function test_reception_registers_stock_in_selected_warehouse(): void
     {
         [$user,$product,$origin] = $this->inventoryFixtures();
+        $supplier=BusinessPartner::create(['type'=>'Proveedor','document_type'=>'RUC','document_number'=>'20987654321','name'=>'PROVEEDOR RECEPCION','is_active'=>true]);
+        $requirement=Requirement::create(['code'=>'REQ-INV-001','requested_at'=>'2026-08-27','responsible'=>'Jefe almacén','project'=>'Mina','area'=>'LOGISTICA','priority'=>'Media','status'=>'Aprobado']);
+        $requirementItem=$requirement->items()->create(['product_id'=>$product->id,'product_name'=>$product->name,'quantity'=>8,'approved_quantity'=>8,'unit'=>$product->unit,'priority'=>'Media','approval_status'=>'Aprobado']);
+        $order=PurchaseOrder::create(['code'=>'OCO-INV-001','destination_branch'=>$origin->branch?->name ?? 'Principal','destination_warehouse'=>$origin->name,'document'=>'OCO','series'=>'001','number'=>'900001','supplier_id'=>$supplier->id,'payment_condition'=>'CONTADO','currency'=>'PEN','area'=>'LOGISTICA','subtotal'=>0,'tax'=>0,'total'=>0,'status'=>'Aprobada','receipt_status'=>'Pendiente']);
+        $orderItem=$order->items()->create(['requirement_item_id'=>$requirementItem->id,'product_id'=>$product->id,'product_name'=>$product->name,'cost_center'=>'MINA','quantity'=>8,'received_quantity'=>0,'unit'=>$product->unit,'unit_price'=>0,'total'=>0]);
 
         $this->actingAs($user)->post(route('product-receptions.store'), [
-            'received_at'=>'2026-08-27', 'warehouse'=>$origin->name,
-            'items'=>[['product_id'=>$product->id,'quantity'=>8]],
+            'received_at'=>'2026-08-27', 'purchase_order_id'=>$order->id,
+            'items'=>[['purchase_order_item_id'=>$orderItem->id,'quantity'=>8]],
         ])->assertRedirect(route('product-receptions.index'));
 
         $this->assertDatabaseHas('inventory_stocks',['product_id'=>$product->id,'warehouse_id'=>$origin->id,'quantity'=>8]);

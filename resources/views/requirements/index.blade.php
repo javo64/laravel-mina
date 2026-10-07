@@ -19,10 +19,51 @@
 </div>
 <div class="card">
     <form class="toolbar"><label>⌕ <input name="q" value="{{ request('q') }}" placeholder="Buscar código, responsable o proyecto..."></label><button>Buscar</button></form>
-    <div class="table-wrap"><table><thead><tr><th>Código</th><th>Fecha</th><th>Responsable</th><th>Proyecto</th><th>Área</th><th>Ítems</th><th>Prioridad</th><th>Estado</th>@if(auth()->user()->isAdministrator())<th></th>@endif</tr></thead><tbody>
-        @foreach($requirements as $item)<tr><td><code>{{ $item->code }}</code></td><td>{{ $item->requested_at->format('d/m/Y') }}</td><td><strong>{{ $item->responsible }}</strong></td><td>{{ $item->project }}</td><td><em>{{ $item->area }}</em></td><td>{{ $item->items->count() }}</td><td>{{ $item->priority }}</td><td><span class="badge {{ \Illuminate\Support\Str::slug($item->status) }}">{{ $item->status }}</span></td>@if(auth()->user()->isAdministrator())<td>@if($item->status==='Pendiente' && ! $item->decision_at)<form method="post" action="{{ route('requirements.destroy',$item) }}" onsubmit="return confirm('¿Eliminar definitivamente este requerimiento?')">@csrf @method('DELETE')<button class="danger">Eliminar</button></form>@else<small title="Tiene una aprobación vinculada">Vinculado</small>@endif</td>@endif</tr>@endforeach
+    <div class="table-wrap"><table><thead><tr><th>Código</th><th>Fecha</th><th>Responsable</th><th>Proyecto</th><th>Área</th><th>Ítems</th><th>Prioridad</th><th>Estado</th><th></th></tr></thead><tbody>
+        @foreach($requirements as $item)
+            <tr>
+                <td><code>{{ $item->code }}</code></td>
+                <td>{{ $item->requested_at->format('d/m/Y') }}</td>
+                <td><strong>{{ $item->responsible }}</strong></td>
+                <td>{{ $item->project }}</td>
+                <td><em>{{ $item->area }}</em></td>
+                <td>{{ $item->items->count() }}</td>
+                <td>{{ $item->priority }}</td>
+                <td><span class="badge {{ \Illuminate\Support\Str::slug($item->status) }}">{{ $item->status }}</span></td>
+                <td>
+                    <div class="row-actions">
+                        @if($item->status === 'Pendiente')
+                            <button type="button" onclick="document.getElementById('edit-requirement-{{ $item->id }}').showModal()">Editar</button>
+                        @endif
+                        @if(auth()->user()->isAdministrator())
+                            <form method="post" action="{{ route('requirements.destroy', $item) }}" onsubmit="return confirm('¿Eliminar definitivamente este requerimiento, su aprobación y sus cotizaciones?')">
+                                @csrf
+                                @method('DELETE')
+                                <button class="danger">Eliminar</button>
+                            </form>
+                        @endif
+                    </div>
+                </td>
+            </tr>
+        @endforeach
     </tbody></table></div>{{ $requirements->links() }}
 </div>
+
+@foreach($requirements as $requirement)
+@if($requirement->status === 'Pendiente')
+<dialog class="requirement-dialog requirement-edit-dialog" id="edit-requirement-{{ $requirement->id }}"><form method="post" enctype="multipart/form-data" action="{{ route('requirements.update', $requirement) }}">@csrf @method('PUT')
+    <div class="modal-head product-modal-head"><span class="modal-icon">✎</span><div><h2>Editar requerimiento {{ $requirement->code }}</h2><p>Disponible únicamente mientras el requerimiento esté pendiente.</p></div><button type="button" data-close>×</button></div>
+    <div class="requirement-form"><div class="form-section-title"><strong>Información general</strong><span>Los cambios quedarán en la misma solicitud pendiente.</span></div>
+        <label class="req-span-4">Fecha *<input type="date" name="requested_at" value="{{ $requirement->requested_at->format('Y-m-d') }}" required></label>
+        <label class="req-span-4">Responsable *<select name="responsible" required>@foreach($responsibles as $responsible)<option value="{{ $responsible->name }}" @selected($requirement->responsible === $responsible->name)>{{ $responsible->name }}</option>@endforeach</select></label>
+        <label class="req-span-4">Mina / proyecto *<select name="project" required>@foreach($projects as $project)<option value="{{ $project->name }}" @selected($requirement->project === $project->name)>{{ $project->name }}</option>@endforeach</select></label>
+        <label class="req-span-4">Área solicitante *<select name="area" required>@foreach($areas as $area)<option value="{{ $area->name }}" @selected($requirement->area === $area->name)>{{ $area->name }}</option>@endforeach</select></label>
+        <div class="requested-products-title"><div><strong>Ítems solicitados</strong><small>Para mantener trazabilidad, no se agregan ni retiran filas; puedes editar sus datos.</small></div></div>
+        <div class="requirement-edit-items">@foreach($requirement->items as $index => $item)<section><input type="hidden" name="items[{{ $index }}][id]" value="{{ $item->id }}"><b>{{ $index + 1 }}</b><label>Producto *<select name="items[{{ $index }}][product_id]" required>@foreach($products as $product)<option value="{{ $product->id }}" @selected($item->product_id === $product->id)>{{ $product->code }} · {{ $product->name }}</option>@endforeach</select></label><label>Centro de costos *<select name="items[{{ $index }}][cost_center_id]" required>@foreach($costCenters as $costCenter)<option value="{{ $costCenter->id }}" @selected($item->cost_center_id === $costCenter->id)>{{ $costCenter->parent->name }} · {{ $costCenter->name }}</option>@endforeach</select></label><label>Cantidad *<input type="number" step="0.01" min="0.01" name="items[{{ $index }}][quantity]" value="{{ $item->quantity }}" required></label><label>Prioridad *<select name="items[{{ $index }}][priority]">@foreach(['Alta','Media','Baja'] as $priority)<option @selected($item->priority === $priority)>{{ $priority }}</option>@endforeach</select></label><label class="edit-description">Descripción<input name="items[{{ $index }}][description]" value="{{ $item->description }}"></label><label>Reemplazar imagen<input type="file" name="items[{{ $index }}][image]" accept="image/jpeg,image/png,image/webp"></label></section>@endforeach</div>
+    </div><div class="modal-foot"><small>Una vez aprobado, este requerimiento quedará bloqueado para edición.</small><button type="button" data-close>Cancelar</button><button class="primary">Guardar cambios</button></div>
+</form></dialog>
+@endif
+@endforeach
 
 <dialog id="responsibles"><div class="modal-head"><div><h2>Registro de responsables</h2><p>Administra las personas que pueden solicitar requerimientos.</p></div><button type="button" data-close>×</button></div>
     <form method="post" action="{{ route('responsibles.store') }}">@csrf
@@ -136,6 +177,29 @@
         const row = wrapper.firstElementChild; nextIndex++; rows.appendChild(row); bind(row); refresh();
     });
     refresh();
+
+    const productGroups = @json($groupData);
+    const productForm = document.querySelector('#new-product-from-requirement .product-form');
+    if (productForm) {
+        const group = productForm.querySelector('.product-group-select');
+        const subgroup = productForm.querySelector('.product-subgroup-select');
+        const category = productForm.querySelector('.product-category-value');
+        const refreshSubgroups = () => {
+            const selected = subgroup.dataset.selected;
+            subgroup.innerHTML = '<option value="">Sin subgrupo</option>';
+            (productGroups.find(item => String(item.id) === group.value)?.subgroups || []).forEach(item => subgroup.add(new Option(`${item.code} · ${item.name}`, item.id, false, String(item.id) === String(selected))));
+            category.value = subgroup.selectedOptions[0]?.text?.replace(/^.* · /, '') || '';
+            subgroup.dataset.selected = '';
+        };
+        const toggleOperation = () => {
+            const purchase = productForm.querySelector('[name="operation_type"]:checked')?.value === 'Compra';
+            productForm.querySelectorAll('.sales-only').forEach(field => { field.hidden = purchase; field.querySelectorAll('input,select').forEach(input => input.disabled = purchase); });
+        };
+        group.addEventListener('change', refreshSubgroups);
+        subgroup.addEventListener('change', () => { category.value = subgroup.selectedOptions[0]?.text?.replace(/^.* · /, '') || ''; });
+        productForm.querySelectorAll('[name="operation_type"]').forEach(input => input.addEventListener('change', toggleOperation));
+        refreshSubgroups(); toggleOperation();
+    }
 })();
 </script>
 @endpush

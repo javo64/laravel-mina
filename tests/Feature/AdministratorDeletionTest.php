@@ -74,7 +74,7 @@ class AdministratorDeletionTest extends TestCase
         $this->assertSame(5, (int) $product->fresh()->stock);
     }
 
-    public function test_pending_requirements_can_be_deleted_and_approvals_can_be_removed(): void
+    public function test_administrator_can_delete_pending_or_approved_requirements(): void
     {
         $admin = $this->admin();
         $pending = Requirement::create(['code'=>'REQ-2026-0001','requested_at'=>'2026-08-18','responsible'=>'Javier','project'=>'Mina','area'=>'Operaciones','priority'=>'Media','status'=>'Pendiente']);
@@ -82,12 +82,8 @@ class AdministratorDeletionTest extends TestCase
 
         $this->actingAs($admin)->delete(route('requirements.destroy', $pending))->assertRedirect();
         $this->assertDatabaseMissing('requirements', ['id'=>$pending->id]);
-        $this->actingAs($admin)->delete(route('requirements.destroy', $approved))->assertSessionHasErrors();
-        $this->assertDatabaseHas('requirements', ['id'=>$approved->id,'status'=>'Aprobado']);
-
-        $this->actingAs($admin)->delete(route('approvals.destroy', $approved))->assertRedirect();
-        $this->assertDatabaseHas('requirements', ['id'=>$approved->id,'status'=>'Pendiente','decision_by'=>null]);
-        $this->assertNull($approved->fresh()->decision_at);
+        $this->actingAs($admin)->delete(route('requirements.destroy', $approved))->assertRedirect();
+        $this->assertDatabaseMissing('requirements', ['id'=>$approved->id]);
     }
 
     private function admin(): User

@@ -25,7 +25,7 @@
             <td><strong>{{ $report->form->name }}</strong><small>{{ $report->form->scope ?: 'General' }}</small></td>
             <td>{{ $report->user->name }}</td>
             <td><div class="record-values">@foreach(collect($report->responses)->take(3) as $key=>$value)@php($field=$report->form->fields->firstWhere('field_key',$key))<span><b>{{ $field?->name ?? $key }}:</b> {{ is_array($value)?implode(', ',$value):($value?:'—') }}</span>@endforeach</div></td>
-            <td>@if($report->latitude)<button type="button" class="locate-report" data-id="{{ $report->id }}">⌖ Ver punto</button><a target="_blank" rel="noopener" href="https://www.google.com/maps?q={{ $report->latitude }},{{ $report->longitude }}">Google Maps ↗</a>@else<span class="no-gps">Sin GPS</span>@endif</td>
+            <td>@if($report->latitude)<button type="button" class="locate-report" data-id="{{ $report->id }}">⌖ Ver punto</button><a target="_blank" rel="noopener" href="https://www.google.com/maps?q={{ $report->latitude }},{{ $report->longitude }}">Google Maps ↗</a>@else<span class="no-gps">Sin GPS</span>@endif @if(auth()->user()->isAdministrator())<form method="post" action="{{ route('daily-reports.records.destroy',$report) }}" onsubmit="return confirm('¿Eliminar definitivamente este registro?')">@csrf @method('DELETE')<button class="danger">Eliminar</button></form>@endif</td>
         </tr>@empty<tr><td colspan="5"><div class="empty-state">No existen registros para los filtros seleccionados.</div></td></tr>@endforelse
         </tbody></table></div>
         <div class="records-pagination">{{ $reports->links() }}</div>

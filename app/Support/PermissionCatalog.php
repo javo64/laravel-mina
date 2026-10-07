@@ -7,7 +7,9 @@ class PermissionCatalog
     public const MODULES = [
         'warehouse'=>['label'=>'Almacén','children'=>[
             'warehouse.products'=>'Productos y servicios','warehouse.receptions'=>'Recepción de productos','warehouse.inventory'=>'Inventario',
-            'warehouse.structure'=>'Empresas, sucursales y almacenes','warehouse.requirements'=>'Requerimientos','warehouse.approvals'=>'Aprobaciones',
+            'warehouse.structure'=>'Empresas, sucursales y almacenes','warehouse.requirements'=>'Requerimientos',
+            'warehouse.approvals'=>'Aprobaciones: consulta','warehouse.approvals.review'=>'Aprobaciones: Visto Bueno',
+            'warehouse.approvals.approve'=>'Aprobaciones: aprobación final',
         ]],
         'logistics'=>['label'=>'Logística','children'=>[
             'logistics.partners'=>'Clientes y proveedores','logistics.quotations'=>'Cotizaciones','logistics.purchase-orders'=>'Órdenes de compra',

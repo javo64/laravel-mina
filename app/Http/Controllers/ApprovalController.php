@@ -14,12 +14,23 @@ use Illuminate\Support\Facades\Storage;
 
 class ApprovalController extends Controller
 {
-    private const STATUSES = ['Pendiente', 'Aprobado', 'Aprobado parcial', 'Anulado'];
-    private const BULK_STATUSES = ['Pendiente', 'Aprobado', 'Anulado'];
+    private const STATUSES = ['Pendiente', 'Visto Bueno', 'Aprobado', 'Aprobado parcial', 'Anulado'];
+    private const BULK_STATUSES = ['Pendiente', 'Visto Bueno', 'Aprobado', 'Anulado'];
 
     private function allowed(): void
     {
-        abort_unless(auth()->user()->canAccess('warehouse.approvals'), 403);
+        $user = auth()->user();
+        abort_unless($user->canAccess('warehouse.approvals') || $user->canReviewRequirements() || $user->canApproveRequirements(), 403);
+    }
+
+    private function canReview(): void
+    {
+        abort_unless(auth()->user()->canReviewRequirements(), 403, 'No tienes autorización para dar Visto Bueno.');
+    }
+
+    private function canApprove(): void
+    {
+        abort_unless(auth()->user()->canApproveRequirements(), 403, 'No tienes autorización para dar la aprobación final.');
     }
 
     public function index(Request $request)
@@ -36,14 +47,14 @@ class ApprovalController extends Controller
         $totalRequirements = Requirement::whereHas('items')->count();
         $items = null;
         if ($activeStatus === 'Todos') {
-            $requirements = Requirement::with(['items.decisionMaker'])
+            $requirements = Requirement::with(['items.decisionMaker', 'items.reviewer'])
                 ->whereHas('items')
                 ->latest('requested_at')
                 ->latest('id')
                 ->paginate(12)
                 ->withQueryString();
         } else {
-            $items = RequirementItem::with(['requirement.decisionMaker', 'requirement.items.decisionMaker', 'decisionMaker'])
+            $items = RequirementItem::with(['requirement.decisionMaker', 'requirement.reviewer', 'requirement.items.decisionMaker', 'requirement.items.reviewer', 'decisionMaker', 'reviewer'])
                 ->where('approval_status', $activeStatus)
                 ->latest('updated_at')
                 ->latest('id')
@@ -57,7 +68,10 @@ class ApprovalController extends Controller
             : collect();
         $quotationProcesses = $approvalSection === 'cotizaciones' ? QuotationProcess::with(['requirement.items','quotations.supplier','winner.supplier','submitter'])->where('status','Pendiente aprobación')->latest('submitted_at')->paginate(12,['*'],'cotizaciones_page')->withQueryString() : collect();
 
-        return view('approvals.index', compact('items', 'requirements', 'activeStatus', 'counts', 'totalRequirements', 'approvalSection', 'purchaseOrders','quotationProcesses'));
+        $canReview = auth()->user()->canReviewRequirements();
+        $canApprove = auth()->user()->canApproveRequirements();
+
+        return view('approvals.index', compact('items', 'requirements', 'activeStatus', 'counts', 'totalRequirements', 'approvalSection', 'purchaseOrders','quotationProcesses', 'canReview', 'canApprove'));
     }
 
     public function decideItem(Request $request, RequirementItem $requirementItem)
@@ -68,6 +82,19 @@ class ApprovalController extends Controller
             'approved_quantity' => ['nullable', 'numeric', 'min:0.01'],
         ]);
         $status = $decision['status'];
+        if ($status === 'Visto Bueno') {
+            $this->canReview();
+            if ($requirementItem->approval_status !== 'Pendiente') {
+                return back()->withErrors(['status' => 'Solo los ítems pendientes pueden recibir Visto Bueno.']);
+            }
+        } elseif ($status === 'Pendiente') {
+            abort_unless(auth()->user()->isAdministrator(), 403);
+        } else {
+            $this->canApprove();
+            if (in_array($status, ['Aprobado', 'Aprobado parcial'], true) && $requirementItem->approval_status !== 'Visto Bueno') {
+                return back()->withErrors(['status' => 'El ítem debe contar primero con Visto Bueno antes de aprobarse.']);
+            }
+        }
         $approvedQuantity = match ($status) {
             'Aprobado' => (float) $requirementItem->quantity,
             'Aprobado parcial' => (float) ($decision['approved_quantity'] ?? 0),
@@ -78,12 +105,15 @@ class ApprovalController extends Controller
         }
 
         DB::transaction(function () use ($requirementItem, $status, $approvedQuantity): void {
-            $requirementItem->update([
-                'approval_status' => $status,
-                'approved_quantity' => $approvedQuantity,
-                'decision_at' => $status === 'Pendiente' ? null : now(),
-                'decision_by' => $status === 'Pendiente' ? null : auth()->id(),
-            ]);
+            $changes = ['approval_status' => $status];
+            if ($status === 'Visto Bueno') {
+                $changes += ['reviewed_at' => now(), 'reviewed_by' => auth()->id(), 'approved_quantity' => null, 'decision_at' => null, 'decision_by' => null];
+            } elseif ($status === 'Pendiente') {
+                $changes += ['reviewed_at' => null, 'reviewed_by' => null, 'approved_quantity' => null, 'decision_at' => null, 'decision_by' => null];
+            } else {
+                $changes += ['approved_quantity' => $approvedQuantity, 'decision_at' => now(), 'decision_by' => auth()->id()];
+            }
+            $requirementItem->update($changes);
             $this->synchronizeRequirement($requirementItem->requirement()->firstOrFail());
         });
 
@@ -98,13 +128,30 @@ class ApprovalController extends Controller
             'status' => ['required', Rule::in(self::BULK_STATUSES)],
         ])['status'];
 
+        if ($decision === 'Visto Bueno') {
+            $this->canReview();
+            if ($requirement->items()->where('approval_status', '!=', 'Pendiente')->exists()) {
+                return back()->withErrors(['status' => 'El Visto Bueno total solo se puede aplicar cuando todos los ítems están pendientes.']);
+            }
+        } elseif ($decision === 'Pendiente') {
+            abort_unless(auth()->user()->isAdministrator(), 403);
+        } else {
+            $this->canApprove();
+            if ($decision === 'Aprobado' && $requirement->items()->where('approval_status', '!=', 'Visto Bueno')->exists()) {
+                return back()->withErrors(['status' => 'Todos los ítems deben tener Visto Bueno antes de la aprobación total.']);
+            }
+        }
+
         DB::transaction(function () use ($requirement, $decision): void {
-            $requirement->items()->update([
-                'approval_status' => $decision,
-                'approved_quantity' => $decision === 'Aprobado' ? DB::raw('quantity') : null,
-                'decision_at' => $decision === 'Pendiente' ? null : now(),
-                'decision_by' => $decision === 'Pendiente' ? null : auth()->id(),
-            ]);
+            $changes = ['approval_status' => $decision];
+            if ($decision === 'Visto Bueno') {
+                $changes += ['reviewed_at' => now(), 'reviewed_by' => auth()->id(), 'approved_quantity' => null, 'decision_at' => null, 'decision_by' => null];
+            } elseif ($decision === 'Pendiente') {
+                $changes += ['reviewed_at' => null, 'reviewed_by' => null, 'approved_quantity' => null, 'decision_at' => null, 'decision_by' => null];
+            } else {
+                $changes += ['approved_quantity' => $decision === 'Aprobado' ? DB::raw('quantity') : null, 'decision_at' => now(), 'decision_by' => auth()->id()];
+            }
+            $requirement->items()->update($changes);
             $this->synchronizeRequirement($requirement);
         });
 
@@ -119,8 +166,8 @@ class ApprovalController extends Controller
         }
 
         DB::transaction(function () use ($requirement): void {
-            $requirement->items()->update(['approval_status'=>'Pendiente', 'approved_quantity'=>null, 'decision_at'=>null, 'decision_by'=>null]);
-            $requirement->update(['status'=>'Pendiente', 'decision_at'=>null, 'decision_by'=>null]);
+            $requirement->items()->update(['approval_status'=>'Pendiente', 'reviewed_at'=>null, 'reviewed_by'=>null, 'approved_quantity'=>null, 'decision_at'=>null, 'decision_by'=>null]);
+            $requirement->update(['status'=>'Pendiente', 'reviewed_at'=>null, 'reviewed_by'=>null, 'decision_at'=>null, 'decision_by'=>null]);
         });
 
         return back()->with('success', 'Las decisiones fueron eliminadas y todos los ítems volvieron a Pendiente.');
@@ -129,6 +176,7 @@ class ApprovalController extends Controller
     public function decidePurchaseOrder(Request $request, PurchaseOrder $purchaseOrder)
     {
         $this->allowed();
+        $this->canApprove();
         $status = $request->validate(['status' => ['required', Rule::in(['Aprobada', 'Anulada'])]])['status'];
         $purchaseOrder->update(['status' => $status]);
         return redirect()->route('approvals.index', ['seccion' => 'ordenes'])->with('success', "Orden {$purchaseOrder->code} marcada como {$status}.");
@@ -137,6 +185,7 @@ class ApprovalController extends Controller
     public function decideQuotation(Request $request, QuotationProcess $quotationProcess)
     {
         $this->allowed();
+        $this->canApprove();
         $data=$request->validate(['status'=>['required',Rule::in(['Aprobada','Rechazada'])],'observation'=>['nullable','string','max:2000','required_if:status,Rechazada']]);
         abort_unless($quotationProcess->status==='Pendiente aprobación',422);
         $quotationProcess->update(['status'=>$data['status'],'approval_observation'=>$data['observation']??null,'decided_at'=>now(),'decided_by'=>auth()->id()]);
@@ -169,16 +218,20 @@ class ApprovalController extends Controller
 
     private function synchronizeRequirement(Requirement $requirement): void
     {
-        $statuses = $requirement->items()->pluck('approval_status');
-        $status = $statuses->every(fn ($itemStatus) => $itemStatus === 'Pendiente')
+        $items = $requirement->items()->get();
+        $statuses = $items->pluck('approval_status');
+        $status = $statuses->isEmpty() || $statuses->every(fn ($itemStatus) => $itemStatus === 'Pendiente')
             ? 'Pendiente'
-            : ($statuses->isNotEmpty() && $statuses->every(fn ($itemStatus) => $itemStatus === 'Aprobado') ? 'Aprobado total' : 'Aprobado parcial');
-        $isPending = $status === 'Pendiente';
+            : ($statuses->contains('Visto Bueno') ? 'Visto Bueno' : 'Aprobación');
+        $reviewed = $items->filter(fn ($item) => $item->reviewed_at)->sortByDesc('reviewed_at')->first();
+        $decided = $items->filter(fn ($item) => $item->decision_at)->sortByDesc('decision_at')->first();
 
         $requirement->update([
             'status' => $status,
-            'decision_at' => $isPending ? null : now(),
-            'decision_by' => $isPending ? null : auth()->id(),
+            'reviewed_at' => $reviewed?->reviewed_at,
+            'reviewed_by' => $reviewed?->reviewed_by,
+            'decision_at' => $decided?->decision_at,
+            'decision_by' => $decided?->decision_by,
         ]);
     }
 }

@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class PurchaseOrder extends Model
 {
-    protected $fillable = ['code', 'destination_branch', 'destination_warehouse', 'document', 'series', 'number', 'supplier_id', 'bank_account_id', 'payment_condition', 'currency', 'area', 'tax_exempt', 'subtotal', 'tax', 'total', 'status', 'created_by'];
+    protected $fillable = ['code', 'destination_branch', 'destination_warehouse', 'document', 'series', 'number', 'supplier_id', 'bank_account_id', 'payment_condition', 'currency', 'area', 'tax_exempt', 'subtotal', 'tax', 'total', 'status', 'receipt_status', 'created_by'];
 
     protected function casts(): array
     {
@@ -17,5 +17,6 @@ class PurchaseOrder extends Model
     public function bankAccount() { return $this->belongsTo(BankAccount::class); }
     public function items() { return $this->hasMany(PurchaseOrderItem::class); }
     public function quotations() { return $this->hasMany(PurchaseOrderQuotation::class); }
+    public function receptions() { return $this->hasMany(ProductReception::class); }
     public function creator() { return $this->belongsTo(User::class, 'created_by'); }
 }

@@ -16,6 +16,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // HTTP local. Confiar en sus cabeceras permite generar assets y rutas
         // con el esquema HTTPS que ve el usuario.
         $middleware->trustProxies(at: '*');
+        $middleware->alias(['active.company' => \App\Http\Middleware\EnsureActiveCompany::class]);
+        $middleware->alias(['active.company' => \App\Http\Middleware\EnsureActiveCompany::class]);
+        $middleware->alias(['active.company' => \App\Http\Middleware\EnsureActiveCompany::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

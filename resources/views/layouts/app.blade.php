@@ -14,10 +14,13 @@
             <button id="sidebar-collapse" class="sidebar-collapse" type="button" title="Contraer menú" aria-label="Contraer menú" aria-expanded="true"><span>‹</span></button>
             <button class="sidebar-close" type="button" aria-label="Cerrar módulos" onclick="document.body.classList.remove('nav-open')">×</button>
         </div>
-        <div class="company" title="Fabulosa Company · {{ auth()->user()->branch }}"><span>FC</span><div><strong>Fabulosa Company</strong><small>{{ auth()->user()->branch }}</small></div></div>
+        <form class="company company-switcher" method="post" action="{{ route('companies.activate') }}" title="Cambiar empresa activa">@csrf<span>▣</span><div><small>EMPRESA ACTIVA</small><select name="company_id" onchange="this.form.submit()" aria-label="Empresa activa">@forelse($availableCompanies as $company)<option value="{{ $company->id }}" @selected($activeCompany?->id === $company->id)>{{ $company->legal_name ?: $company->name }}</option>@empty<option>Sin empresa configurada</option>@endforelse</select></div><b>⌄</b></form>
         <nav aria-label="Módulos principales"><p>MÓDULOS</p>
             @if(auth()->user()->canAccess('warehouse.products')||auth()->user()->canAccess('warehouse.receptions')||auth()->user()->canAccess('warehouse.inventory')||auth()->user()->canAccess('warehouse.structure')||auth()->user()->canAccess('warehouse.requirements')||auth()->user()->canAccess('warehouse.approvals'))
             <div class="module" data-module="warehouse"><button class="module-title" type="button" title="Contraer Almacén" aria-expanded="true"><span class="module-icon">▦</span><span class="module-label">ALMACÉN</span><span class="module-chevron">⌃</span></button><div class="module-links">
+                @if(auth()->user()->canAccess('warehouse.inventory'))
+                <a data-label="Centro de control" title="Centro de control" class="{{ request()->routeIs('warehouse.dashboard')?'active':'' }}" href="{{ route('warehouse.dashboard') }}"><span class="nav-icon">▣</span><span class="nav-label">Centro de control</span></a>
+                @endif
                 @if(auth()->user()->canAccess('warehouse.products'))
                 <a data-label="Productos y Servicios" title="Productos y Servicios" class="{{ request()->routeIs('products.*')?'active':'' }}" href="{{ route('products.index') }}"><span class="nav-icon">◈</span><span class="nav-label">Productos y Servicios</span></a>
                 @endif

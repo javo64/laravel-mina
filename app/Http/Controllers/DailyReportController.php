@@ -206,6 +206,25 @@ class DailyReportController extends Controller
         return redirect()->route($request->boolean('mobile') ? 'mobile.daily-reports.index' : 'daily-reports.records')->with('success', 'Parte diario registrado correctamente.');
     }
 
+    public function destroyForm(DailyReportForm $dailyReportForm)
+    {
+        abort_unless(auth()->user()->isAdministrator(), 403);
+        $photos=$dailyReportForm->reports()->get()->flatMap(fn($report)=>collect($report->responses)
+            ->filter(fn($value)=>is_string($value)&&str_starts_with($value,'daily-reports/')))->values()->all();
+        $dailyReportForm->delete();
+        \Illuminate\Support\Facades\Storage::disk('public')->delete($photos);
+        return redirect()->route('daily-reports.index')->with('success','Cartilla y sus registros eliminados definitivamente.');
+    }
+
+    public function destroyReport(DailyReport $dailyReport)
+    {
+        abort_unless(auth()->user()->isAdministrator(), 403);
+        $photos=collect($dailyReport->responses)->filter(fn($value,$key)=>is_string($value)&&str_starts_with($value,'daily-reports/'))->values()->all();
+        $dailyReport->delete();
+        \Illuminate\Support\Facades\Storage::disk('public')->delete($photos);
+        return back()->with('success','Registro de cartilla eliminado definitivamente.');
+    }
+
     private function validatedForm(Request $request): array
     {
         $data = $request->validate([

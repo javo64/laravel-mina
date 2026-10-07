@@ -52,6 +52,27 @@ class User extends Authenticatable
         return $this->profile === 'Administrador';
     }
 
+    public function canReviewRequirements(): bool
+    {
+        if ($this->isAdministrator()) return true;
+
+        $permissions = $this->permissions ?? [];
+        return in_array('warehouse.approvals.review', $permissions, true)
+            || in_array('warehouse.approvals.approve', $permissions, true)
+            || in_array('warehouse.approvals', $permissions, true)
+            || in_array('approvals', $permissions, true);
+    }
+
+    public function canApproveRequirements(): bool
+    {
+        if ($this->isAdministrator()) return true;
+
+        $permissions = $this->permissions ?? [];
+        return in_array('warehouse.approvals.approve', $permissions, true)
+            || in_array('warehouse.approvals', $permissions, true)
+            || in_array('approvals', $permissions, true);
+    }
+
     public function dailyReports()
     {
         return $this->hasMany(DailyReport::class);

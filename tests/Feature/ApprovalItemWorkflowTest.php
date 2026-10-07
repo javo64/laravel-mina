@@ -19,12 +19,13 @@ class ApprovalItemWorkflowTest extends TestCase
         $first = $requirement->items()->create(['product_name'=>'Filtro','quantity'=>2,'unit'=>'Unidad','priority'=>'Alta']);
         $second = $requirement->items()->create(['product_name'=>'Aceite','quantity'=>5,'unit'=>'Galón','priority'=>'Media']);
 
+        $this->actingAs($approver)->post(route('approvals.items.decide', $first), ['status'=>'Visto Bueno']);
         $this->actingAs($approver)->post(route('approvals.items.decide', $first), ['status'=>'Aprobado'])
             ->assertRedirect(route('approvals.index', ['estado'=>'Aprobado']));
 
         $this->assertDatabaseHas('requirement_items', ['id'=>$first->id,'approval_status'=>'Aprobado','decision_by'=>$approver->id]);
         $this->assertDatabaseHas('requirement_items', ['id'=>$second->id,'approval_status'=>'Pendiente','decision_by'=>null]);
-        $this->assertSame('Aprobado parcial', $requirement->fresh()->status);
+        $this->assertSame('Aprobación', $requirement->fresh()->status);
     }
 
     public function test_cards_separate_all_pending_approved_and_annulled_items(): void
@@ -64,7 +65,7 @@ class ApprovalItemWorkflowTest extends TestCase
 
         $this->actingAs($approver)->post(route('approvals.decide', $requirement), ['status'=>'Anulado'])->assertRedirect();
 
-        $this->assertSame('Aprobado parcial', $requirement->fresh()->status);
+        $this->assertSame('Aprobación', $requirement->fresh()->status);
         $this->assertSame(2, RequirementItem::where('requirement_id', $requirement->id)->where('approval_status', 'Anulado')->count());
     }
 
@@ -74,6 +75,11 @@ class ApprovalItemWorkflowTest extends TestCase
         $requirement = $this->requirement();
         $item = $requirement->items()->create(['product_name'=>'Cable','quantity'=>10,'unit'=>'Metro','priority'=>'Alta']);
 
+        $this->actingAs($approver)->post(route('approvals.items.decide', $item), ['status'=>'Visto Bueno']);
+        $this->actingAs($approver)->from(route('approvals.index'))->post(route('approvals.items.decide', $item), [
+            'status'=>'Aprobado parcial', 'approved_quantity'=>10,
+        ])->assertRedirect(route('approvals.index'))->assertSessionHasErrors('approved_quantity');
+
         $this->actingAs($approver)->post(route('approvals.items.decide', $item), [
             'status'=>'Aprobado parcial', 'approved_quantity'=>6,
         ])->assertRedirect(route('approvals.index', ['estado'=>'Aprobado parcial']));
@@ -81,11 +87,7 @@ class ApprovalItemWorkflowTest extends TestCase
         $this->assertDatabaseHas('requirement_items', [
             'id'=>$item->id, 'approval_status'=>'Aprobado parcial', 'approved_quantity'=>6,
         ]);
-        $this->assertSame('Aprobado parcial', $requirement->fresh()->status);
-
-        $this->actingAs($approver)->from(route('approvals.index'))->post(route('approvals.items.decide', $item), [
-            'status'=>'Aprobado parcial', 'approved_quantity'=>10,
-        ])->assertRedirect(route('approvals.index'))->assertSessionHasErrors('approved_quantity');
+        $this->assertSame('Aprobación', $requirement->fresh()->status);
     }
 
     public function test_requirement_becomes_totally_approved_when_all_items_are_approved(): void
@@ -95,10 +97,12 @@ class ApprovalItemWorkflowTest extends TestCase
         $first = $requirement->items()->create(['product_name'=>'Filtro','quantity'=>2,'unit'=>'Unidad','priority'=>'Alta']);
         $second = $requirement->items()->create(['product_name'=>'Aceite','quantity'=>5,'unit'=>'Galón','priority'=>'Media']);
 
+        $this->actingAs($approver)->post(route('approvals.items.decide', $first), ['status'=>'Visto Bueno']);
+        $this->actingAs($approver)->post(route('approvals.items.decide', $second), ['status'=>'Visto Bueno']);
         $this->actingAs($approver)->post(route('approvals.items.decide', $first), ['status'=>'Aprobado']);
         $this->actingAs($approver)->post(route('approvals.items.decide', $second), ['status'=>'Aprobado']);
 
-        $this->assertSame('Aprobado total', $requirement->fresh()->status);
+        $this->assertSame('Aprobación', $requirement->fresh()->status);
         $this->assertSame('2.00', $first->fresh()->approved_quantity);
         $this->assertSame('5.00', $second->fresh()->approved_quantity);
     }

@@ -8,6 +8,8 @@ use App\Models\BusinessPartner;
 use App\Models\Warehouse;
 use App\Models\InventoryStock;
 use App\Models\InventoryMovement;
+use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderItem;
 use App\Services\OpenAiDocumentReader;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -25,7 +27,7 @@ class ProductReceptionController extends Controller
     public function index(Request $request)
     {
         $this->allowed();
-        $receptions = ProductReception::with(['items', 'receiver'])
+        $receptions = ProductReception::with(['items', 'receiver', 'purchaseOrder.supplier'])
             ->when($request->q, fn ($query, $value) => $query->where(fn ($search) => $search
                 ->where('code', 'like', "%$value%")
                 ->orWhere('supplier', 'like', "%$value%")
@@ -33,14 +35,27 @@ class ProductReceptionController extends Controller
                 ->orWhere('invoice_number', 'like', "%$value%")
                 ->orWhere('order_number', 'like', "%$value%")))
             ->latest('received_at')->latest('id')->paginate(10)->withQueryString();
-        $products = Product::where('is_active', true)->where('type', 'Producto')->orderBy('name')->get();
         $supplierCount = BusinessPartner::where('is_active', true)
             ->whereIn('type', ['Proveedor', 'Cliente y proveedor'])
             ->count();
         $nextCode = $this->formatCode((ProductReception::max('id') ?? 0) + 1);
 
+        $receivableOrders = PurchaseOrder::with([
+                'supplier',
+                'items' => fn ($query) => $query->whereNotNull('product_id')
+                    ->whereHas('product', fn ($product) => $product->where('type', 'Producto'))
+                    ->with('product'),
+                'receptions',
+            ])
+            ->where('document', 'OCO')
+            ->where('status', 'Aprobada')
+            ->where('receipt_status', '!=', 'Completa')
+            ->whereHas('items', fn ($query) => $query->whereNotNull('product_id')
+                ->whereColumn('received_quantity', '<', 'quantity')
+                ->whereHas('product', fn ($product) => $product->where('type', 'Producto')))
+            ->latest()->get();
         $warehouses = Warehouse::with('branch')->where('is_active',true)->orderBy('name')->get();
-        return view('product-receptions.index', compact('receptions', 'products', 'supplierCount', 'nextCode', 'warehouses'));
+        return view('product-receptions.index', compact('receptions', 'receivableOrders', 'supplierCount', 'nextCode', 'warehouses'));
     }
 
     public function searchSuppliers(Request $request)
@@ -62,8 +77,8 @@ class ProductReceptionController extends Controller
     {
         $this->allowed();
         $data = $request->validate([
+            'purchase_order_id' => ['required', Rule::exists('purchase_orders','id')->where(fn ($query) => $query->where('document','OCO')->where('status','Aprobada'))],
             'received_at' => ['required', 'date'],
-            'supplier' => ['nullable', 'string', 'max:255'],
             'guide_number' => ['nullable', 'string', 'max:100'],
             'guide_file' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
             'guide_camera' => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:10240'],
@@ -73,17 +88,16 @@ class ProductReceptionController extends Controller
             'order_number' => ['nullable', 'string', 'max:100'],
             'order_file' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
             'order_camera' => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:10240'],
-            'warehouse' => ['required', 'string', 'max:150', Rule::exists('warehouses','name')->where('is_active',true)],
             'notes' => ['nullable', 'string', 'max:1000'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['required', 'integer', 'distinct', 'exists:products,id'],
+            'items.*.purchase_order_item_id' => ['required', 'integer', 'distinct', 'exists:purchase_order_items,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
         ]);
-        if (filled($data['supplier'] ?? null) && ! BusinessPartner::where('name', $data['supplier'])
-            ->where('is_active', true)->whereIn('type', ['Proveedor', 'Cliente y proveedor'])->exists()) {
-            throw ValidationException::withMessages([
-                'supplier' => 'Selecciona un proveedor activo registrado en Logística.',
-            ]);
+
+        $order = PurchaseOrder::with('supplier')->whereKey($data['purchase_order_id'])
+            ->where('document','OCO')->where('status','Aprobada')->firstOrFail();
+        if ($order->receipt_status === 'Completa') {
+            throw ValidationException::withMessages(['purchase_order_id' => 'Esta orden ya fue recibida completamente.']);
         }
 
         $storedFiles = [];
@@ -94,37 +108,53 @@ class ProductReceptionController extends Controller
             }
         }
 
-        $warehouse = Warehouse::where('name',$data['warehouse'])->where('is_active',true)->firstOrFail();
+        $warehouse = Warehouse::where('name',$order->destination_warehouse)->where('is_active',true)->firstOrFail();
         try {
-            DB::transaction(function () use ($data, $storedFiles, $warehouse) {
+            DB::transaction(function () use ($data, $storedFiles, $warehouse, $order) {
+            $lockedOrder = PurchaseOrder::whereKey($order->id)->lockForUpdate()->firstOrFail();
+            if ($lockedOrder->status !== 'Aprobada' || $lockedOrder->receipt_status === 'Completa') {
+                throw ValidationException::withMessages(['purchase_order_id' => 'La orden ya no está disponible para recepción.']);
+            }
             $sequence = (ProductReception::lockForUpdate()->max('id') ?? 0) + 1;
             $reception = ProductReception::create([
+                'purchase_order_id' => $lockedOrder->id,
                 'code' => $this->formatCode($sequence),
                 'received_at' => $data['received_at'],
-                'supplier' => $data['supplier'] ?? null,
+                'supplier' => $lockedOrder->supplier?->name,
                 'guide_number' => $data['guide_number'] ?? null,
                 'guide_file' => $storedFiles['guide_file'] ?? null,
                 'invoice_number' => $data['invoice_number'] ?? null,
                 'invoice_file' => $storedFiles['invoice_file'] ?? null,
-                'order_number' => $data['order_number'] ?? null,
+                'order_number' => $lockedOrder->code,
                 'order_file' => $storedFiles['order_file'] ?? null,
-                'warehouse' => $data['warehouse'],
+                'warehouse' => $lockedOrder->destination_warehouse,
                 'notes' => $data['notes'] ?? null,
                 'received_by' => auth()->id(),
             ]);
 
             foreach ($data['items'] as $index => $item) {
-                $product = Product::whereKey($item['product_id'])->lockForUpdate()->firstOrFail();
+                $orderItem = PurchaseOrderItem::whereKey($item['purchase_order_item_id'])
+                    ->where('purchase_order_id', $lockedOrder->id)->lockForUpdate()->first();
+                if (! $orderItem) {
+                    throw ValidationException::withMessages(["items.$index.purchase_order_item_id" => 'El producto no pertenece a la orden seleccionada.']);
+                }
+                $pending = (float) $orderItem->quantity - (float) $orderItem->received_quantity;
+                if ($pending <= 0 || (float) $item['quantity'] > $pending) {
+                    throw ValidationException::withMessages(["items.$index.quantity" => "La cantidad supera el saldo pendiente de {$orderItem->product_name}."]);
+                }
+                $product = Product::whereKey($orderItem->product_id)->lockForUpdate()->firstOrFail();
                 if (! $product->is_active || $product->type !== 'Producto') {
                     throw ValidationException::withMessages([
-                        "items.$index.product_id" => 'El producto seleccionado no está disponible para recepción.',
+                        "items.$index.purchase_order_item_id" => 'El producto seleccionado no está disponible para recepción.',
                     ]);
                 }
 
                 $stockBefore = (int) $product->stock;
                 $stockAfter = $stockBefore + (int) $item['quantity'];
                 $product->update(['stock' => $stockAfter]);
+                $orderItem->increment('received_quantity', $item['quantity']);
                 $receptionItem=$reception->items()->create([
+                    'purchase_order_item_id' => $orderItem->id,
                     'product_id' => $product->id,
                     'product_code' => $product->code,
                     'product_name' => $product->name,
@@ -137,6 +167,7 @@ class ProductReceptionController extends Controller
                 $inventoryStock->increment('quantity',$item['quantity']);
                 InventoryMovement::create(['code'=>'REC-'.str_pad((string)$receptionItem->id,6,'0',STR_PAD_LEFT),'occurred_at'=>$data['received_at'].' 12:00:00','type'=>'Entrada','product_id'=>$product->id,'destination_warehouse_id'=>$warehouse->id,'quantity'=>$item['quantity'],'reference'=>$reception->code,'product_reception_item_id'=>$receptionItem->id,'created_by'=>auth()->id()]);
             }
+            $this->synchronizeReceiptStatus($lockedOrder);
             });
         } catch (\Throwable $exception) {
             foreach ($storedFiles as $path) {
@@ -171,6 +202,7 @@ class ProductReceptionController extends Controller
 
         $deleted = DB::transaction(function () use ($productReception) {
             $reception = ProductReception::with('items')->lockForUpdate()->findOrFail($productReception->id);
+            $order = $reception->purchase_order_id ? PurchaseOrder::whereKey($reception->purchase_order_id)->lockForUpdate()->first() : null;
             $products = [];
             foreach ($reception->items as $item) {
                 $product = Product::lockForUpdate()->find($item->product_id);
@@ -181,14 +213,17 @@ class ProductReceptionController extends Controller
                 if (! $product || $legacyStockChanged || $hasLaterMovement || (float)$product->stock < (float)$item->quantity || ($movement && (!$stock || (float)$stock->quantity < (float)$item->quantity))) {
                     return false;
                 }
-                $products[] = [$product, $stock, $movement, (float)$item->quantity];
+                $orderItem = $item->purchase_order_item_id ? PurchaseOrderItem::whereKey($item->purchase_order_item_id)->lockForUpdate()->first() : null;
+                $products[] = [$product, $stock, $movement, $orderItem, (float)$item->quantity];
             }
-            foreach ($products as [$product,$stock,$movement,$quantity]) {
+            foreach ($products as [$product,$stock,$movement,$orderItem,$quantity]) {
                 $product->decrement('stock',$quantity);
                 if($stock)$stock->decrement('quantity',$quantity);
+                if($orderItem)$orderItem->decrement('received_quantity',$quantity);
                 $movement?->delete();
             }
             $reception->delete();
+            if($order)$this->synchronizeReceiptStatus($order);
 
             return true;
         });
@@ -199,5 +234,15 @@ class ProductReceptionController extends Controller
         foreach ($files as $file) Storage::disk('public')->delete($file);
 
         return back()->with('success', 'Recepción eliminada y stock revertido correctamente.');
+    }
+
+    private function synchronizeReceiptStatus(PurchaseOrder $order): void
+    {
+        $items = $order->items()->whereNotNull('product_id')
+            ->whereHas('product', fn ($product) => $product->where('type', 'Producto'))
+            ->get(['quantity','received_quantity']);
+        $received = $items->sum(fn ($item) => (float) $item->received_quantity);
+        $complete = $items->isNotEmpty() && $items->every(fn ($item) => (float) $item->received_quantity >= (float) $item->quantity);
+        $order->update(['receipt_status' => $complete ? 'Completa' : ($received > 0 ? 'Parcial' : 'Pendiente')]);
     }
 }

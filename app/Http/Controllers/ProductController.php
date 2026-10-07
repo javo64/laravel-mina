@@ -10,6 +10,8 @@ use App\Models\RequirementItem;
 use App\Models\InventoryMovement;
 use App\Models\InventoryStock;
 use App\Models\Warehouse;
+use App\Models\ProductGroup;
+use App\Models\ProductSubgroup;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -22,12 +24,24 @@ class ProductController extends Controller
     public function index(Request $request)
     {
         $this->allowed();
-        $products = Product::where('is_active', true)
+        $products = Product::with(['productGroup', 'productSubgroup'])->where('is_active', true)
             ->when($request->q, fn ($q, $value) => $q->where(fn ($search) => $search->where('name','like',"%$value%")->orWhere('code','like',"%$value%")->orWhere('category','like',"%$value%")))
             ->latest()->paginate(10);
         $categories = ProductCategory::where('is_active', true)->orderBy('name')->get();
         $units = MeasurementUnit::where('is_active', true)->orderBy('name')->get();
-        return view('products.index', compact('products', 'categories', 'units'));
+        $groups = ProductGroup::with(['subgroups' => fn ($query) => $query->where('is_active', true)])->where('is_active', true)->orderBy('code')->get();
+        $groupData = $groups->map(function (ProductGroup $group): array {
+            return [
+                'id' => $group->id,
+                'name' => $group->name,
+                'subgroups' => $group->subgroups->map(fn (ProductSubgroup $subgroup): array => [
+                    'id' => $subgroup->id,
+                    'code' => $subgroup->code,
+                    'name' => $subgroup->name,
+                ])->values()->all(),
+            ];
+        })->values()->all();
+        return view('products.index', compact('products', 'categories', 'units', 'groups', 'groupData'));
     }
 
     public function store(Request $request)
@@ -71,17 +85,38 @@ class ProductController extends Controller
 
     private function validated(Request $request, ?Product $product = null): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'type' => ['required', Rule::in(['Producto','Servicio'])],
+            'operation_type' => ['nullable', Rule::in(['Compra', 'Venta'])],
             'name' => ['required','max:255'], 'secondary_name' => ['required','max:255'],
             'description' => ['required','max:1000'],
             'code' => ['nullable','max:50', Rule::unique('products','code')->ignore($product?->id)],
             'barcode' => ['required','max:100'], 'category' => ['required','max:100'],
-            'unit' => ['required','max:50'], 'currency' => ['required', Rule::in(['PEN','USD'])],
+            'unit' => ['required','max:50'], 'currency' => ['nullable', Rule::in(['PEN','USD'])],
             'price' => ['nullable','numeric','min:0'], 'stock' => ['nullable','integer','min:0'],
-            'min_stock' => ['nullable','integer','min:0'], 'warehouse' => ['required','max:150'],
+            'min_stock' => ['nullable','integer','min:0'], 'warehouse' => ['nullable','max:150'],
             'tax_affectation' => ['required','max:150'],
+            'product_group_id' => ['nullable', Rule::exists('product_groups', 'id')],
+            'product_subgroup_id' => ['nullable', Rule::exists('product_subgroups', 'id')],
         ]);
+        if (!empty($data['product_subgroup_id'])) {
+            $subgroup = ProductSubgroup::find($data['product_subgroup_id']);
+            if (! $subgroup || ($data['product_group_id'] ?? null) != $subgroup->product_group_id) {
+                throw ValidationException::withMessages(['product_subgroup_id' => 'El subgrupo no pertenece al grupo seleccionado.']);
+            }
+            $data['category'] = $subgroup->name;
+        }
+        $data['operation_type'] = $data['operation_type'] ?? 'Venta';
+        if ($data['operation_type'] === 'Compra') {
+            if ($product && (float) InventoryStock::where('product_id', $product->id)->sum('quantity') > 0) {
+                throw ValidationException::withMessages(['operation_type' => 'No se puede cambiar a Compra un ítem que tiene existencias. Regulariza primero el stock desde Inventario.']);
+            }
+            $data['price'] = 0;
+            $data['stock'] = 0;
+            $data['min_stock'] = 0;
+        }
+        $data['currency'] = $data['currency'] ?? 'PEN';
+        return $data;
     }
 
     private function setFlags(Request $request, array &$data): void
@@ -101,7 +136,7 @@ class ProductController extends Controller
 
     private function syncInventory(Product $product): void
     {
-        if ($product->type !== 'Producto') return;
+        if ($product->type !== 'Producto' || $product->operation_type === 'Compra') return;
         $warehouse = Warehouse::whereRaw('UPPER(name) = ?', [mb_strtoupper($product->warehouse)])->first()
             ?? Warehouse::where('is_active', true)->orderBy('id')->firstOrFail();
         $stock = InventoryStock::firstOrCreate(['product_id'=>$product->id,'warehouse_id'=>$warehouse->id],['quantity'=>0]);

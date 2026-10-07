@@ -70,4 +70,16 @@ class QuotationController extends Controller
         abort_unless(Storage::disk('local')->exists($requirementQuotation->path),404);
         return response()->file(Storage::disk('local')->path($requirementQuotation->path),['Content-Type'=>$requirementQuotation->mime_type,'X-Content-Type-Options'=>'nosniff']);
     }
+
+    public function destroy(QuotationProcess $quotationProcess)
+    {
+        abort_unless(auth()->user()->isAdministrator(), 403);
+        $hasOrder = $quotationProcess->requirement->items()
+            ->whereHas('purchaseOrderItems')->exists();
+        if ($hasOrder) return back()->withErrors('Primero debes eliminar la orden vinculada a esta cotización.');
+        $files = $quotationProcess->quotations()->pluck('path')->all();
+        $quotationProcess->delete();
+        Storage::disk('local')->delete($files);
+        return back()->with('success', 'Proceso de cotización eliminado definitivamente.');
+    }
 }
