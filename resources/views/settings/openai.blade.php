@@ -15,6 +15,7 @@
                 {{ $setting->hasApiKey() ? ($setting->is_active ? 'Configurado' : 'Desactivado') : 'Sin configurar' }}
             </span>
         </div>
+        @if($setting->hasUnreadableApiKey())<p class="form-error">La clave guardada pertenece a una instalación anterior y no puede leerse. Registra una nueva clave para reactivar OpenAI.</p>@endif
         <form method="post" action="{{ route('settings.openai.update') }}" class="openai-settings-form">@csrf @method('PUT')
             <label>Clave secreta de OpenAI
                 <div class="secret-input">

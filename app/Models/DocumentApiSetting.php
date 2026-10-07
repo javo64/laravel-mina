@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Contracts\Encryption\DecryptException;
 
 class DocumentApiSetting extends Model
 {
@@ -21,7 +22,28 @@ class DocumentApiSetting extends Model
 
     public function hasToken(): bool
     {
-        return filled($this->token);
+        return filled($this->tokenValue());
+    }
+
+    public function tokenValue(): ?string
+    {
+        try {
+            return $this->token;
+        } catch (DecryptException) {
+            return null;
+        }
+    }
+
+    public function hasUnreadableToken(): bool
+    {
+        if (blank($this->getRawOriginal('token'))) return false;
+
+        try {
+            $this->getAttribute('token');
+            return false;
+        } catch (DecryptException) {
+            return true;
+        }
     }
 
     public static function current(): self

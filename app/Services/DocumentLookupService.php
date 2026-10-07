@@ -13,7 +13,8 @@ class DocumentLookupService
     public function lookup(string $document): array
     {
         $setting = DocumentApiSetting::current();
-        if (! $setting->is_active || ! $setting->hasToken()) {
+        $token = $setting->tokenValue();
+        if (! $setting->is_active || ! filled($token)) {
             throw ValidationException::withMessages([
                 'document_number' => 'La API de consulta de documentos no está configurada o está desactivada.',
             ]);
@@ -26,7 +27,7 @@ class DocumentLookupService
             : rtrim($setting->url, '/').'/api/'.$documentType;
 
         try {
-            $request = Http::withToken($setting->token)
+            $request = Http::withToken($token)
                 ->withOptions(['verify' => resource_path('certificates/cacert.pem')])
                 ->acceptJson()->asJson()->timeout(30)->retry(2, 400, throw: false);
             $response = $usesDocumentInUrl

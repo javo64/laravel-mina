@@ -10,6 +10,7 @@
             <div><h2>Credenciales del servicio</h2><p>Admite una URL base como <code>https://apiperu.dev</code> o una ruta con <code>{document}</code>.</p></div>
             <span class="credential-status {{ $setting->hasToken() && $setting->is_active ? 'configured' : '' }}">{{ $setting->hasToken() ? ($setting->is_active ? 'Configurado' : 'Desactivado') : 'Sin configurar' }}</span>
         </div>
+        @if($setting->hasUnreadableToken())<p class="form-error">El token guardado pertenece a una instalación anterior y no puede leerse. Registra un nuevo token para reactivar la API.</p>@endif
         <form method="post" action="{{ route('settings.document-api.update') }}" class="openai-settings-form">@csrf @method('PUT')
             <label>URL de consulta *
                 <input type="url" name="url" required value="{{ old('url',$setting->url) }}" placeholder="https://apiperu.dev">

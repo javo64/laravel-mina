@@ -29,6 +29,9 @@ class OpenAiSettingController extends Controller
             'api_key' => ['nullable', 'string', 'min:20', 'max:500'],
             'model' => ['required', Rule::in(['gpt-5.6-sol'])],
         ]);
+        if ($setting->hasUnreadableApiKey() && blank($data['api_key'] ?? null)) {
+            return back()->withErrors(['api_key' => 'La clave anterior no se puede leer. Ingresa una nueva clave de OpenAI para reemplazarla.'])->withInput();
+        }
 
         $values = [
             'model' => $data['model'],

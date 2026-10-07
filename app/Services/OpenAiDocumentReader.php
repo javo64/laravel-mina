@@ -14,7 +14,8 @@ class OpenAiDocumentReader
     public function analyze(UploadedFile $file): array
     {
         $setting = OpenAiSetting::current();
-        if (! $setting->is_active || ! $setting->hasApiKey()) {
+        $apiKey = $setting->apiKey();
+        if (! $setting->is_active || ! filled($apiKey)) {
             throw ValidationException::withMessages([
                 'document' => 'La integración con OpenAI no está configurada o se encuentra desactivada.',
             ]);
@@ -34,7 +35,7 @@ class OpenAiDocumentReader
             : ['type' => 'input_image', 'image_url' => $dataUrl, 'detail' => 'high'];
 
         try {
-            $response = Http::withToken($setting->api_key)
+            $response = Http::withToken($apiKey)
                 ->withOptions(['verify' => resource_path('certificates/cacert.pem')])
                 ->acceptJson()->timeout(90)->retry(2, 500, throw: false)
                 ->post('https://api.openai.com/v1/responses', [

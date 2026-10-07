@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Contracts\Encryption\DecryptException;
 
 class OpenAiSetting extends Model
 {
@@ -26,7 +27,28 @@ class OpenAiSetting extends Model
 
     public function hasApiKey(): bool
     {
-        return filled($this->api_key);
+        return filled($this->apiKey());
+    }
+
+    public function apiKey(): ?string
+    {
+        try {
+            return $this->api_key;
+        } catch (DecryptException) {
+            return null;
+        }
+    }
+
+    public function hasUnreadableApiKey(): bool
+    {
+        if (blank($this->getRawOriginal('api_key'))) return false;
+
+        try {
+            $this->getAttribute('api_key');
+            return false;
+        } catch (DecryptException) {
+            return true;
+        }
     }
 
     public static function current(): self

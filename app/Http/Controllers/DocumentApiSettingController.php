@@ -28,6 +28,9 @@ class DocumentApiSettingController extends Controller
             'url' => ['required', 'url:http,https', 'max:1000'],
             'token' => ['nullable', 'string', 'min:10', 'max:2000'],
         ]);
+        if ($setting->hasUnreadableToken() && blank($data['token'] ?? null)) {
+            return back()->withErrors(['token' => 'El token anterior no se puede leer. Ingresa un nuevo token para reemplazarlo.'])->withInput();
+        }
         $values = [
             'url' => trim($data['url']),
             'is_active' => $request->boolean('is_active'),
