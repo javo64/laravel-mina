@@ -66,7 +66,13 @@ class ApprovalController extends Controller
         $purchaseOrders = $approvalSection === 'ordenes'
             ? PurchaseOrder::with(['supplier', 'creator', 'items', 'quotations', 'bankAccount.bank'])->latest()->paginate(12, ['*'], 'ordenes_page')->withQueryString()
             : collect();
-        $quotationProcesses = $approvalSection === 'cotizaciones' ? QuotationProcess::with(['requirement.items','quotations.supplier','winner.supplier','submitter'])->where('status','Pendiente aprobación')->latest('submitted_at')->paginate(12,['*'],'cotizaciones_page')->withQueryString() : collect();
+        $quotationProcesses = $approvalSection === 'cotizaciones'
+            ? QuotationProcess::with(['requirement', 'items.requirement', 'quotations.supplier', 'winner.supplier', 'submitter'])
+                ->where('status', 'Pendiente aprobación')
+                ->latest('submitted_at')
+                ->paginate(12, ['*'], 'cotizaciones_page')
+                ->withQueryString()
+            : collect();
 
         $canReview = auth()->user()->canReviewRequirements();
         $canApprove = auth()->user()->canApproveRequirements();

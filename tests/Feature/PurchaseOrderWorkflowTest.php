@@ -27,6 +27,7 @@ class PurchaseOrderWorkflowTest extends TestCase
         $item = $requirement->items()->create(['product_name'=>'Válvula', 'quantity'=>2, 'unit'=>'Unidad', 'priority'=>'Media', 'approval_status'=>'Aprobado']);
         Storage::disk('local')->put('requirement-quotations/winner.pdf','pdf');
         $process=QuotationProcess::create(['requirement_id'=>$requirement->id,'status'=>'Aprobada','submitted_at'=>now()]);
+        $process->items()->attach($item->id);
         $winning=$process->quotations()->create(['supplier_id'=>$supplier->id,'path'=>'requirement-quotations/winner.pdf','original_name'=>'cotizacion-proveedor.pdf','mime_type'=>'application/pdf','size'=>3,'currency'=>'PEN','is_winner'=>true]);
 
         $this->actingAs($user)->get(route('purchase-orders.index'))

@@ -35,17 +35,19 @@
 <dialog class="approved-items-dialog" id="approved-items-dialog"><div class="modal-head product-modal-head"><span class="modal-icon">☑</span><div><h2>Productos aprobados</h2><p>Marca los ítems que deseas añadir a la orden.</p></div><button type="button" data-close>×</button></div><div class="approved-items-tools"><label><input type="checkbox" id="approved-select-all"> Seleccionar todos</label><span id="approved-selection-count">0 seleccionados</span></div><div id="approved-items-list" class="approved-items-list"></div><div class="modal-foot"><small>Solo se muestran ítems con aprobación vigente.</small><button type="button" data-close>Cancelar</button><button type="button" class="primary" id="add-approved-selected">Agregar seleccionados</button></div></dialog>
 @endsection
 @php
-    $approvedOrderData = $approvedRequirements->map(function ($requirement) {
-        return [
-            'id' => $requirement->id,
-            'code' => $requirement->code,
+    $approvedOrderData = $approvedRequirements->flatMap(function ($requirement) {
+        return $requirement->items->groupBy(fn ($item) => $item->quotationProcesses->first()?->id)->map(function ($items) use ($requirement) {
+            $process = $items->first()->quotationProcesses->first();
+            return [
+            'id' => $process->id,
+            'code' => $process->block_code ?: $requirement->code,
             'area' => $requirement->area,
             'responsible' => $requirement->responsible,
-            'supplierId' => $requirement->quotationProcess->winner->supplier_id,
-            'supplier' => $requirement->quotationProcess->winner->supplier->name,
-            'quoteName' => $requirement->quotationProcess->winner->original_name,
-            'quoteUrl' => route('quotations.show',$requirement->quotationProcess->winner),
-            'items' => $requirement->items->map(function ($item) {
+            'supplierId' => $process->winner->supplier_id,
+            'supplier' => $process->winner->supplier->name,
+            'quoteName' => $process->winner->original_name,
+            'quoteUrl' => route('quotations.show',$process->winner),
+            'items' => $items->map(function ($item) {
                 return [
                     'id' => $item->id, 'name' => $item->product_name, 'description' => $item->description,
                     'quantity' => (float) ($item->approved_quantity ?? $item->quantity), 'unit' => $item->unit, 'costCenter' => $item->cost_center,
@@ -53,6 +55,7 @@
                 ];
             })->values(),
         ];
+        })->values();
     })->values();
 @endphp
 @push('scripts')

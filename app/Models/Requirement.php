@@ -13,4 +13,5 @@ class Requirement extends Model
     public function decisionMaker(): BelongsTo { return $this->belongsTo(User::class, 'decision_by'); }
     public function reviewer(): BelongsTo { return $this->belongsTo(User::class, 'reviewed_by'); }
     public function quotationProcess() { return $this->hasOne(QuotationProcess::class); }
+    public function quotationProcesses() { return $this->hasMany(QuotationProcess::class); }
 }

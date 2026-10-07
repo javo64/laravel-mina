@@ -12,6 +12,7 @@ class RequirementItem extends Model
     public function product() { return $this->belongsTo(Product::class); }
     public function costCenter() { return $this->belongsTo(CostCenter::class); }
     public function purchaseOrderItems() { return $this->hasMany(PurchaseOrderItem::class); }
+    public function quotationProcesses() { return $this->belongsToMany(QuotationProcess::class, 'quotation_process_items')->withTimestamps(); }
     public function decisionMaker() { return $this->belongsTo(User::class, 'decision_by'); }
     public function reviewer() { return $this->belongsTo(User::class, 'reviewed_by'); }
 }

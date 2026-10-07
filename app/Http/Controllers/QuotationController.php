@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\BusinessPartner;
 use App\Models\QuotationProcess;
 use App\Models\Requirement;
+use App\Models\RequirementItem;
 use App\Models\RequirementQuotation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,17 +20,32 @@ class QuotationController extends Controller
     public function index()
     {
         $this->allowed();
-        $requirements = Requirement::with(['items','quotationProcess.quotations.supplier'])
-            ->whereIn('status',['Aprobado','Aprobado total','Aprobado parcial'])->latest('requested_at')->paginate(12);
+        $availableItems = RequirementItem::with('requirement')
+            ->whereIn('approval_status', ['Aprobado', 'Aprobado parcial'])
+            ->whereDoesntHave('purchaseOrderItems')
+            ->whereDoesntHave('quotationProcesses', fn ($query) => $query->whereIn('status', ['Pendiente aprobación', 'Aprobada']))
+            ->latest('id')->get();
+        $requirements = $availableItems->groupBy('requirement_id');
+        $processes = QuotationProcess::with(['items.requirement', 'quotations.supplier'])
+            ->latest('id')->paginate(12);
         $suppliers = BusinessPartner::where('is_active',true)->whereIn('type',['Proveedor','Cliente y proveedor'])->orderBy('name')->get();
-        return view('quotations.index',compact('requirements','suppliers'));
+        return view('quotations.index',compact('requirements','availableItems','processes','suppliers'));
     }
 
     public function store(Request $request, Requirement $requirement)
     {
+        $request->merge(['item_ids' => $requirement->items()
+            ->whereIn('approval_status', ['Aprobado', 'Aprobado parcial'])->pluck('id')->all()]);
+
+        return $this->storeBatch($request);
+    }
+
+    public function storeBatch(Request $request)
+    {
         $this->allowed();
-        abort_unless(in_array($requirement->status,['Aprobado','Aprobado total','Aprobado parcial'],true),422);
         $data=$request->validate([
+            'item_ids' => ['required', 'array', 'min:1'],
+            'item_ids.*' => ['required', 'integer', 'distinct', 'exists:requirement_items,id'],
             'quotes'=>['required','array','min:3','max:8'], 'quotes.*.supplier_label'=>['required','string','distinct','max:300'],
             'quotes.*.file'=>['required','file','mimes:pdf,jpg,jpeg,png,webp','max:10240'], 'quotes.*.amount'=>['nullable','numeric','min:0'],
             'quotes.*.currency'=>['required',Rule::in(['PEN','USD'])], 'winner_index'=>['required','integer','min:0'],
@@ -47,12 +63,19 @@ class QuotationController extends Controller
         if(collect($data['quotes'])->pluck('supplier_id')->duplicates()->isNotEmpty()) throw ValidationException::withMessages(['quotes'=>'Los tres proveedores deben ser diferentes.']);
         $stored=[];$old=[];
         try{
-            DB::transaction(function()use($request,$requirement,$data,&$stored,&$old){
-                $process=QuotationProcess::where('requirement_id',$requirement->id)->lockForUpdate()->first();
-                if($process&&$process->status==='Pendiente aprobación') throw ValidationException::withMessages(['quotes'=>'La propuesta ya está esperando aprobación.']);
-                if($process&&$process->status==='Aprobada') throw ValidationException::withMessages(['quotes'=>'La cotización ganadora ya fue aprobada.']);
-                if(!$process) $process=QuotationProcess::create(['requirement_id'=>$requirement->id]);
-                else{$old=$process->quotations()->pluck('path')->all();$process->quotations()->delete();$process->increment('version');}
+            DB::transaction(function()use($request,$data,&$stored){
+                $items = RequirementItem::with('requirement')
+                    ->whereKey($data['item_ids'])
+                    ->whereIn('approval_status', ['Aprobado', 'Aprobado parcial'])
+                    ->whereDoesntHave('purchaseOrderItems')
+                    ->whereDoesntHave('quotationProcesses', fn ($query) => $query->whereIn('status', ['Pendiente aprobación', 'Aprobada']))
+                    ->lockForUpdate()->get();
+                if ($items->count() !== count($data['item_ids'])) {
+                    throw ValidationException::withMessages(['item_ids' => 'Uno o más ítems ya no están disponibles para cotizar. Actualiza la página e inténtalo nuevamente.']);
+                }
+                $process = QuotationProcess::create(['requirement_id' => $items->first()->requirement_id]);
+                $process->update(['block_code' => 'COT-'.now()->year.'-'.str_pad((string) $process->id, 4, '0', STR_PAD_LEFT)]);
+                $process->items()->sync($items->pluck('id'));
                 foreach($data['quotes'] as $i=>$quote){
                     $file=$request->file("quotes.$i.file");$path=$file->store('requirement-quotations','local');$stored[]=$path;
                     $process->quotations()->create(['supplier_id'=>$quote['supplier_id'],'path'=>$path,'original_name'=>$file->getClientOriginalName(),'mime_type'=>$file->getMimeType()?:'application/octet-stream','size'=>$file->getSize(),'amount'=>$quote['amount']??null,'currency'=>$quote['currency'],'is_winner'=>$i===(int)$data['winner_index']]);
@@ -60,8 +83,7 @@ class QuotationController extends Controller
                 $process->update(['status'=>'Pendiente aprobación','approval_observation'=>null,'submitted_at'=>now(),'submitted_by'=>auth()->id(),'decided_at'=>null,'decided_by'=>null]);
             });
         }catch(\Throwable $exception){Storage::disk('local')->delete($stored);throw $exception;}
-        Storage::disk('local')->delete($old);
-        return redirect()->route('quotations.index')->with('success','Cotizaciones enviadas correctamente a Aprobaciones → Cotizaciones ganadoras.');
+        return redirect()->route('quotations.index')->with('success','Bloque de cotización enviado correctamente a Aprobaciones → Cotizaciones ganadoras.');
     }
 
     public function show(RequirementQuotation $requirementQuotation)
@@ -74,8 +96,7 @@ class QuotationController extends Controller
     public function destroy(QuotationProcess $quotationProcess)
     {
         abort_unless(auth()->user()->isAdministrator(), 403);
-        $hasOrder = $quotationProcess->requirement->items()
-            ->whereHas('purchaseOrderItems')->exists();
+        $hasOrder = $quotationProcess->items()->whereHas('purchaseOrderItems')->exists();
         if ($hasOrder) return back()->withErrors('Primero debes eliminar la orden vinculada a esta cotización.');
         $files = $quotationProcess->quotations()->pluck('path')->all();
         $quotationProcess->delete();

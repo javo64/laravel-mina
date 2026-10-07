@@ -34,9 +34,11 @@ class PurchaseOrderController extends Controller
             ->orderBy('name')->get();
         $bankAccounts = BankAccount::with(['partner','bank'])->where('is_active', true)->orderBy('bank_name')->get();
         $banks = Bank::where('is_active', true)->orderBy('name')->get();
-        $approvedRequirements = Requirement::with(['quotationProcess.winner.supplier','items' => fn ($query) => $query->whereIn('approval_status', ['Aprobado', 'Aprobado parcial'])->whereDoesntHave('purchaseOrderItems')->with('product')])
-            ->whereHas('quotationProcess',fn($query)=>$query->where('status','Aprobada')->whereHas('winner'))
-            ->whereHas('items', fn ($query) => $query->whereIn('approval_status', ['Aprobado', 'Aprobado parcial'])->whereDoesntHave('purchaseOrderItems'))
+        $approvedRequirements = Requirement::with(['items' => fn ($query) => $query->whereIn('approval_status', ['Aprobado', 'Aprobado parcial'])
+            ->whereDoesntHave('purchaseOrderItems')
+            ->whereHas('quotationProcesses', fn ($processes) => $processes->where('status', 'Aprobada')->whereHas('winner'))
+            ->with(['product', 'quotationProcesses' => fn ($processes) => $processes->where('status', 'Aprobada')->with('winner.supplier')])])
+            ->whereHas('items', fn ($query) => $query->whereIn('approval_status', ['Aprobado', 'Aprobado parcial'])->whereDoesntHave('purchaseOrderItems')->whereHas('quotationProcesses', fn ($processes) => $processes->where('status', 'Aprobada')->whereHas('winner')))
             ->latest('requested_at')->get();
         $branches = Branch::where('is_active', true)->orderBy('name')->get();
         $warehouses = Warehouse::where('is_active', true)->with('branch')->orderBy('name')->get();
@@ -76,7 +78,7 @@ class PurchaseOrderController extends Controller
             DB::transaction(function () use ($data): void {
                 $lines = collect($data['items'])->map(function (array $line) use ($data) {
                 $source = RequirementItem::with('product')->whereIn('approval_status', ['Aprobado', 'Aprobado parcial'])->lockForUpdate()->findOrFail($line['requirement_item_id']);
-                $process=$source->requirement()->with('quotationProcess.winner')->firstOrFail()->quotationProcess;
+                $process = $source->quotationProcesses()->where('status', 'Aprobada')->with('winner')->first();
                 if(!$process || $process->status!=='Aprobada' || !$process->winner || (int)$process->winner->supplier_id!==(int)$data['supplier_id']) abort(422,'El proveedor seleccionado no corresponde a la cotización ganadora aprobada del requerimiento.');
                 if ($source->purchaseOrderItems()->exists()) {
                     abort(422, "El ítem {$source->product_name} ya fue utilizado en una orden y no puede volver a seleccionarse.");
