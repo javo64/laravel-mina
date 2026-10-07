@@ -21,8 +21,8 @@ class QuotationController extends Controller
     {
         $this->allowed();
         $availableItems = RequirementItem::with('requirement')
-            ->whereIn('approval_status', ['Aprobado', 'Aprobado parcial'])
             ->whereHas('requirement', fn ($query) => $query->whereIn('status', ['Aprobado', 'Aprobado total', 'Aprobado parcial', 'Aprobación']))
+            ->where(fn ($query) => $query->whereNull('approval_status')->orWhere('approval_status', '!=', 'Anulado'))
             ->whereDoesntHave('purchaseOrderItems')
             ->whereDoesntHave('quotationProcesses', fn ($query) => $query->whereIn('status', ['Pendiente aprobación', 'Aprobada']))
             ->latest('id')->get();
@@ -36,7 +36,7 @@ class QuotationController extends Controller
     public function store(Request $request, Requirement $requirement)
     {
         $request->merge(['item_ids' => $requirement->items()
-            ->whereIn('approval_status', ['Aprobado', 'Aprobado parcial'])->pluck('id')->all()]);
+            ->where(fn ($query) => $query->whereNull('approval_status')->orWhere('approval_status', '!=', 'Anulado'))->pluck('id')->all()]);
 
         return $this->storeBatch($request);
     }
@@ -67,8 +67,8 @@ class QuotationController extends Controller
             DB::transaction(function()use($request,$data,&$stored){
                 $items = RequirementItem::with('requirement')
                     ->whereKey($data['item_ids'])
-                    ->whereIn('approval_status', ['Aprobado', 'Aprobado parcial'])
                     ->whereHas('requirement', fn ($query) => $query->whereIn('status', ['Aprobado', 'Aprobado total', 'Aprobado parcial', 'Aprobación']))
+                    ->where(fn ($query) => $query->whereNull('approval_status')->orWhere('approval_status', '!=', 'Anulado'))
                     ->whereDoesntHave('purchaseOrderItems')
                     ->whereDoesntHave('quotationProcesses', fn ($query) => $query->whereIn('status', ['Pendiente aprobación', 'Aprobada']))
                     ->lockForUpdate()->get();
